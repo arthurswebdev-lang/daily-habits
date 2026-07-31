@@ -322,6 +322,20 @@ body {
   color: var(--danger);
 }
 
+.task-calendar-btn {
+  flex-shrink: 0;
+  display: flex;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  padding: 4px;
+  cursor: pointer;
+}
+
+.task-calendar-btn:active {
+  color: var(--accent);
+}
+
 .empty-state {
   flex: 1;
   display: flex;

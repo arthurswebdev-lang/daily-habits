@@ -98,8 +98,13 @@ A task that recurs on a schedule. Has one of these recurrence modes:
   `done` flag per ticket (no reset logic yet — see open question below);
   daily auto-generates its per-slot `subtasks` at creation time.
 
+Tasks now persist in IndexedDB (survive reload/close). Daily recurrence
+regenerates a fresh, unchecked set of per-slot subtasks whenever the
+calendar day has moved on since they were last generated, so a checked-off
+9:00 doesn't stay checked forever — checked at most once every 20s, and
+once at load.
+
 Open question for weekly/monthly recurring tasks: when marked done, does it
 just reset next cycle, or do we keep a history (streak / completion log) you
-can look back on? (Daily's per-slot subtasks reset today only when the app
-reloads — there's no actual day-rollover mechanism yet either, since
-everything is still in-memory only.)
+can look back on? These two still use a single `done` flag with no
+reset/history logic yet.

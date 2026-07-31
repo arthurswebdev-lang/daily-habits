@@ -1,8 +1,3 @@
-// Design-preview stage: everything lives in memory only, no IndexedDB, no
-// persistence — reload resets to the static seed tasks below. This lets us
-// iterate on categories/colors/layout without worrying about stored-data
-// migrations. Persistence comes back once the design is settled.
-
 const CATEGORIES = {
   important:   { label: "Important",   color: "#fb1919", icon: "⭐" },
   work:        { label: "Work",        color: "#13c2f9", icon: "💼" },
@@ -39,66 +34,55 @@ const WEEKDAY_LABEL = Object.fromEntries(WEEKDAYS.map((d) => [d.key, d.label]));
 
 // A task with subtasks has no standalone `done` flag — its completion is
 // derived from how many subtasks are checked (see isDone/progressOf below).
-let tasks = [
-  { id: "seed-1", type: "one-time", label: "Finish quarterly report", category: "work", subtasks: [
-      { id: "seed-1a", label: "Draft outline", done: true },
-      { id: "seed-1b", label: "Write intro",   done: true },
-      { id: "seed-1c", label: "Write body",    done: false },
-      { id: "seed-1d", label: "Proofread",     done: false },
-    ] },
-  { id: "seed-2",  type: "one-time", label: "Leg day",                 category: "gym",         done: false },
-  { id: "seed-3",  type: "one-time", label: "10 min meditation",       category: "selfcare",    done: true  },
-  { id: "seed-4", type: "one-time", label: "Meal prep for the week", category: "food", subtasks: [
-      { id: "seed-4a", label: "Buy groceries",          done: true },
-      { id: "seed-4b", label: "Cook rice",              done: true },
-      { id: "seed-4c", label: "Cook chicken",           done: true },
-      { id: "seed-4d", label: "Portion into containers", done: false },
-    ] },
-  { id: "seed-5",  type: "one-time", label: "Read 20 pages",           category: "reading",     done: false },
-  { id: "seed-6",  type: "one-time", label: "Take vitamin D",          category: "supplements", done: true  },
-  { id: "seed-7",  type: "one-time", label: "Finish course module 3",  category: "education",   done: false },
-  { id: "seed-8",  type: "one-time", label: "Renew passport",          category: "important",   done: false },
+let tasks = [];
 
-  { id: "seed-9", type: "event", label: "Dentist appointment", category: "important", date: "2026-08-05", time: "14:00", done: false },
+// ── persistence (IndexedDB) ──────────────────────────────────────────────
 
-  { id: "seed-10", type: "repetitive", label: "Gym session", category: "gym",
-    recurrence: { kind: "weekly", days: ["mon", "wed", "fri"] }, done: false },
-  { id: "seed-11", type: "repetitive", label: "Pay rent", category: "work",
-    recurrence: { kind: "monthly", dayOfMonth: 1 }, done: false },
-  { id: "seed-12", type: "repetitive", label: "Drink water", category: "selfcare",
-    recurrence: { kind: "daily", start: "09:00", intervalHours: 2, end: "20:00" },
-    subtasks: ["09:00", "11:00", "13:00", "15:00", "17:00", "19:00"].map((time, i) => ({
-      id: `seed-12-${i}`, label: time, done: i < 2,
-    })) },
+const DB_NAME = "daily-tasks-db";
+const DB_VERSION = 1;
+const STORE_NAME = "tasks";
+let db;
 
-  { id: "seed-13", type: "one-time", label: "Reply to client emails", category: "work", done: false },
-  { id: "seed-14", type: "event", label: "Team standup", category: "work", date: "2026-07-31", time: "10:00", done: false },
-  { id: "seed-15", type: "repetitive", label: "Weekly report", category: "work",
-    recurrence: { kind: "weekly", days: ["mon"] }, done: false },
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
 
-  { id: "seed-16", type: "one-time", label: "Cardio session", category: "gym", done: true },
-  { id: "seed-17", type: "one-time", label: "Stretch routine", category: "gym", done: false },
+function getAllTasks() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const request = tx.objectStore(STORE_NAME).getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
 
-  { id: "seed-18", type: "one-time", label: "Skincare routine", category: "selfcare", done: false },
-  { id: "seed-19", type: "one-time", label: "Journal before bed", category: "selfcare", done: false },
+function putTask(task) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(task);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
-  { id: "seed-20", type: "one-time", label: "Grocery shopping", category: "food", done: false },
-  { id: "seed-21", type: "one-time", label: "Try new recipe", category: "food", done: true },
-
-  { id: "seed-22", type: "one-time", label: "Finish chapter 5", category: "reading", done: false },
-  { id: "seed-23", type: "one-time", label: "Buy new book", category: "reading", done: false },
-
-  { id: "seed-24", type: "one-time", label: "Order more vitamins", category: "supplements", done: false },
-
-  { id: "seed-25", type: "one-time", label: "Watch lecture video", category: "education", done: false },
-  { id: "seed-26", type: "event", label: "Submit assignment", category: "education", date: "2026-08-10", time: "09:00", done: false },
-
-  { id: "seed-27", type: "one-time", label: "Car insurance renewal", category: "important", done: false },
-  { id: "seed-28", type: "one-time", label: "Call the bank", category: "important", done: true },
-
-  { id: "seed-29", type: "one-time", label: "Random errand", done: false },
-  { id: "seed-30", type: "one-time", label: "Fix the fence", done: false },
-];
+function deleteTaskRecord(id) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
 const categoryTabs = document.getElementById("category-tabs");
 const categoryPages = document.getElementById("category-pages");
@@ -146,6 +130,33 @@ function generateDailySlots({ start, intervalHours, end }) {
   return slots;
 }
 
+function makeDailySubtasks(taskId, recurrence) {
+  return generateDailySlots(recurrence).map((time, i) => ({ id: `${taskId}-${i}`, label: time, done: false }));
+}
+
+function todayDateString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Now that tasks persist (IndexedDB), a checked-off daily slot would
+// otherwise stay checked forever — this regenerates a fresh, unchecked set
+// of slots whenever the calendar day has moved on since they were last
+// generated, so "daily" recurrence actually resets daily.
+function refreshDailyRecurrences() {
+  const today = todayDateString();
+  let changed = false;
+  for (const task of tasks) {
+    if (task.type !== "repetitive" || task.recurrence?.kind !== "daily") continue;
+    if (task.recurrence.lastGeneratedDate === today) continue;
+    task.subtasks = makeDailySubtasks(task.id, task.recurrence);
+    task.recurrence.lastGeneratedDate = today;
+    putTask(task);
+    changed = true;
+  }
+  return changed;
+}
+
 function formatEventMeta(task) {
   const dt = new Date(`${task.date}T${task.time}`);
   const date = dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -162,6 +173,67 @@ function formatRecurrenceMeta(recurrence) {
     return `Day ${recurrence.dayOfMonth} of month`;
   }
   return `${recurrence.start}–${recurrence.end} · every ${recurrence.intervalHours}h`; // daily
+}
+
+// ── calendar export (.ics) ───────────────────────────────────────────────
+// Lets iOS/Android's own Calendar app own the actual alarm — the browser
+// can't write events silently, but opening this file prompts one native
+// "Add to Calendar" confirmation, no manual data entry required.
+
+function icsEscape(text) {
+  return String(text).replace(/[\\;,]/g, (m) => "\\" + m).replace(/\n/g, "\\n");
+}
+
+function icsDateTime(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}00`;
+}
+
+function icsVevent({ uid, start, summary, rrule }) {
+  return [
+    "BEGIN:VEVENT",
+    `UID:${uid}@daily-tasks`,
+    `DTSTAMP:${icsDateTime(new Date())}`,
+    `DTSTART:${icsDateTime(start)}`,
+    rrule ? `RRULE:${rrule}` : null,
+    `SUMMARY:${icsEscape(summary)}`,
+    "BEGIN:VALARM",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Reminder",
+    "TRIGGER:PT0M",
+    "END:VALARM",
+    "END:VEVENT",
+  ].filter(Boolean).join("\r\n");
+}
+
+function buildTaskICS(task) {
+  if (task.type === "event") {
+    return [icsVevent({ uid: task.id, start: new Date(`${task.date}T${task.time}`), summary: task.label })];
+  }
+  // repetitive/daily: one recurring (FREQ=DAILY) event per time-of-day slot
+  const today = new Date();
+  return task.subtasks.map((sub) => {
+    const [h, m] = sub.label.split(":").map(Number);
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m);
+    return icsVevent({ uid: `${task.id}-${sub.id}`, start, summary: `${task.label} (${sub.label})`, rrule: "FREQ=DAILY" });
+  });
+}
+
+function downloadICS(filename, vevents) {
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Daily Tasks//EN", "CALSCALE:GREGORIAN", ...vevents, "END:VCALENDAR"].join("\r\n");
+  const blob = new Blob([ics], { type: "text/calendar" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function canExportToCalendar(task) {
+  return task.type === "event" || (task.type === "repetitive" && task.recurrence?.kind === "daily" && hasSubtasks(task));
 }
 
 // ── rendering ────────────────────────────────────────────────────────────
@@ -193,6 +265,22 @@ function renderTaskItem(task) {
   del.addEventListener("click", () => {
     if (confirm(`Delete "${task.label}"?`)) removeTask(task.id);
   });
+
+  let calendarBtn = null;
+  if (canExportToCalendar(task)) {
+    calendarBtn = document.createElement("button");
+    calendarBtn.className = "task-calendar-btn";
+    calendarBtn.type = "button";
+    calendarBtn.setAttribute("aria-label", "Add to Calendar");
+    calendarBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="4" y="5" width="16" height="15" rx="2"></rect>' +
+      '<line x1="4" y1="9" x2="20" y2="9"></line>' +
+      '<line x1="8" y1="3" x2="8" y2="7"></line>' +
+      '<line x1="16" y1="3" x2="16" y2="7"></line>' +
+      "</svg>";
+    calendarBtn.addEventListener("click", () => downloadICS(`${task.label}.ics`, buildTaskICS(task)));
+  }
 
   if (hasSubtasks(task)) {
     const progress = progressOf(task);
@@ -251,7 +339,9 @@ function renderTaskItem(task) {
     }
   }
 
-  li.append(checkbox, body, del);
+  li.append(checkbox, body);
+  if (calendarBtn) li.append(calendarBtn);
+  li.append(del);
   return li;
 }
 
@@ -358,6 +448,7 @@ function toggleTask(id) {
   if (!task) return;
   task.done = !task.done;
   render();
+  putTask(task);
 }
 
 function toggleSubtask(taskId, subtaskId) {
@@ -367,23 +458,25 @@ function toggleSubtask(taskId, subtaskId) {
   if (!sub) return;
   sub.done = !sub.done;
   render();
+  putTask(task);
 }
 
 function removeTask(id) {
   tasks = tasks.filter((t) => t.id !== id);
   render();
+  deleteTaskRecord(id);
 }
 
 function clearCompleted() {
+  const removedIds = tasks.filter((t) => isDone(t)).map((t) => t.id);
   tasks = tasks.filter((t) => !isDone(t));
   render();
+  for (const id of removedIds) deleteTaskRecord(id);
 }
 
 clearDoneBtn.addEventListener("click", () => {
   if (confirm("Clear all completed tasks?")) clearCompleted();
 });
-
-render();
 
 // ── add-task wizard ──────────────────────────────────────────────────────
 
@@ -519,9 +612,11 @@ function renderStepRepeatType() {
 function renderStepOneTime() {
   const data = { label: "", category: activeCategory };
   const submitBtn = renderSubmitButton("Add task", () => {
-    tasks.push({ id: crypto.randomUUID(), type: "one-time", label: data.label.trim(), category: data.category || NONE_KEY, done: false });
+    const task = { id: crypto.randomUUID(), type: "one-time", label: data.label.trim(), category: data.category || NONE_KEY, done: false };
+    tasks.push(task);
     closeWizard();
     render();
+    putTask(task);
   });
   const updateReady = () => { submitBtn.disabled = !data.label.trim(); };
 
@@ -538,9 +633,11 @@ function renderStepEvent() {
   const today = new Date().toISOString().slice(0, 10);
   const data = { label: "", category: activeCategory, date: today, time: "09:00" };
   const submitBtn = renderSubmitButton("Add event", () => {
-    tasks.push({ id: crypto.randomUUID(), type: "event", label: data.label.trim(), category: data.category || NONE_KEY, date: data.date, time: data.time, done: false });
+    const task = { id: crypto.randomUUID(), type: "event", label: data.label.trim(), category: data.category || NONE_KEY, date: data.date, time: data.time, done: false };
+    tasks.push(task);
     closeWizard();
     render();
+    putTask(task);
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.date && data.time); };
 
@@ -572,9 +669,11 @@ function renderStepEvent() {
 function renderStepWeekly() {
   const data = { label: "", category: activeCategory, days: [] };
   const submitBtn = renderSubmitButton("Add task", () => {
-    tasks.push({ id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "weekly", days: [...data.days] }, done: false });
+    const task = { id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "weekly", days: [...data.days] }, done: false };
+    tasks.push(task);
     closeWizard();
     render();
+    putTask(task);
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.days.length > 0); };
 
@@ -612,9 +711,11 @@ function renderStepWeekly() {
 function renderStepMonthly() {
   const data = { label: "", category: activeCategory, dayOfMonth: 1 };
   const submitBtn = renderSubmitButton("Add task", () => {
-    tasks.push({ id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "monthly", dayOfMonth: data.dayOfMonth }, done: false });
+    const task = { id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "monthly", dayOfMonth: data.dayOfMonth }, done: false };
+    tasks.push(task);
     closeWizard();
     render();
+    putTask(task);
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.dayOfMonth >= 1 && data.dayOfMonth <= 31); };
 
@@ -640,11 +741,13 @@ function renderStepMonthly() {
 function renderStepDaily() {
   const data = { label: "", category: activeCategory, start: "09:00", intervalHours: 2, end: "20:00" };
   const submitBtn = renderSubmitButton("Add task", () => {
-    const recurrence = { kind: "daily", start: data.start, intervalHours: data.intervalHours, end: data.end };
-    const subtasks = generateDailySlots(recurrence).map((time, i) => ({ id: `${crypto.randomUUID()}-${i}`, label: time, done: false }));
-    tasks.push({ id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence, subtasks });
+    const id = crypto.randomUUID();
+    const recurrence = { kind: "daily", start: data.start, intervalHours: data.intervalHours, end: data.end, lastGeneratedDate: todayDateString() };
+    const task = { id, type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence, subtasks: makeDailySubtasks(id, recurrence) };
+    tasks.push(task);
     closeWizard();
     render();
+    putTask(task);
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.start && data.end && data.intervalHours > 0); };
 
@@ -808,8 +911,17 @@ function checkDueAlerts() {
   playAlertSound();
 }
 
-silenceAlreadyDueAlerts();
-setInterval(checkDueAlerts, 20000);
+(async function init() {
+  db = await openDB();
+  tasks = await getAllTasks();
+  refreshDailyRecurrences();
+  render();
+  silenceAlreadyDueAlerts();
+  setInterval(() => {
+    if (refreshDailyRecurrences()) render();
+    checkDueAlerts();
+  }, 20000);
+})();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
