@@ -74,6 +74,10 @@ body {
   scrollbar-width: none;
 }
 
+.category-tabs[hidden] {
+  display: none;
+}
+
 .category-tabs::-webkit-scrollbar {
   display: none;
 }
@@ -105,6 +109,10 @@ body {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+}
+
+.category-pages[hidden] {
+  display: none;
 }
 
 .category-pages::-webkit-scrollbar {
@@ -367,6 +375,10 @@ body {
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   z-index: 20;
+}
+
+.clear-done-btn[hidden] {
+  display: none;
 }
 
 .clear-done-btn:active {
