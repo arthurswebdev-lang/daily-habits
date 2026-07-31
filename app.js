@@ -141,7 +141,9 @@ function renderTaskItem(task) {
   del.type = "button";
   del.setAttribute("aria-label", "Delete task");
   del.textContent = "×";
-  del.addEventListener("click", () => removeTask(task.id));
+  del.addEventListener("click", () => {
+    if (confirm(`Delete "${task.label}"?`)) removeTask(task.id);
+  });
 
   if (hasSubtasks(task)) {
     const progress = progressOf(task);
@@ -328,7 +330,9 @@ function clearCompleted() {
   render();
 }
 
-clearDoneBtn.addEventListener("click", clearCompleted);
+clearDoneBtn.addEventListener("click", () => {
+  if (confirm("Clear all completed tasks?")) clearCompleted();
+});
 
 render();
 
