@@ -1,0 +1,562 @@
+:root {
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --surface-2: #eceef1;
+  --border: #d1d5db;
+  --text: #111827;
+  --text-dim: #6b7280;
+  --accent: #dc2626;
+  --done: #16a34a;
+  --danger: #b91c1c;
+  --on-color: #14171a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.app-header {
+  padding: calc(env(safe-area-inset-top) + 20px) 20px 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.task-count {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 0 calc(env(safe-area-inset-bottom) + 96px);
+}
+
+/* ── category tabs (jump to a page) ──────────────────────────────────── */
+
+.category-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 16px 16px;
+  scrollbar-width: none;
+}
+
+.category-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.category-tab {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.category-tab.active {
+  border-color: var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 20%, var(--surface));
+}
+
+/* ── swipeable category pages ────────────────────────────────────────── */
+
+.category-pages {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.category-pages::-webkit-scrollbar {
+  display: none;
+}
+
+.category-page {
+  flex: 0 0 100%;
+  max-width: 100%;
+  scroll-snap-align: start;
+  padding: 0 16px;
+}
+
+.category-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--cat-color);
+}
+
+.category-header-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.category-header-label {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--on-color);
+}
+
+.category-header-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-color);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+/* ── task list & cards ────────────────────────────────────────────────── */
+
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+}
+
+.task-list .task-item:last-child {
+  border-bottom: none;
+}
+
+.task-item:has(.subtask-list) {
+  align-items: flex-start;
+}
+
+.task-item:has(.subtask-list) .task-checkbox,
+.task-item:has(.subtask-list) .task-checkbox-progress {
+  margin-top: 2px;
+}
+
+.task-checkbox {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--cat-color, var(--text-dim));
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 13px;
+  padding: 0;
+}
+
+.task-item.done .task-checkbox {
+  border-color: var(--done);
+  background: var(--done);
+  color: var(--on-color);
+}
+
+.task-checkbox-progress {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  cursor: default;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--cat-color);
+  background:
+    radial-gradient(closest-side, var(--surface) 68%, transparent 69% 100%),
+    conic-gradient(var(--cat-color) var(--progress), var(--surface-2) 0);
+}
+
+.task-item.done .task-checkbox-progress {
+  color: var(--done);
+  background:
+    radial-gradient(closest-side, var(--surface) 68%, transparent 69% 100%),
+    conic-gradient(var(--done) var(--progress), var(--surface-2) 0);
+}
+
+.task-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.task-text {
+  font-size: 16px;
+  word-break: break-word;
+}
+
+.task-item.done .task-text {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.task-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cat-color);
+}
+
+.task-item.done .task-meta {
+  color: var(--text-dim);
+}
+
+.subtask-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.subtask-checkbox {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--text-dim);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 11px;
+  padding: 0;
+}
+
+.subtask-item.done .subtask-checkbox {
+  border-color: var(--cat-color);
+  background: var(--cat-color);
+  color: var(--on-color);
+}
+
+.subtask-label {
+  font-size: 14px;
+  color: var(--text-dim);
+  word-break: break-word;
+}
+
+.subtask-item.done .subtask-label {
+  text-decoration: line-through;
+}
+
+.task-delete {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.task-delete:active {
+  color: var(--danger);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+  margin: 40px 16px 0;
+}
+
+.clear-done-btn {
+  display: block;
+  margin: 20px 16px 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.clear-done-btn:active {
+  opacity: 0.8;
+}
+
+/* ── floating add button ─────────────────────────────────────────────── */
+
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(env(safe-area-inset-bottom) + 20px);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.fab:active {
+  opacity: 0.85;
+}
+
+/* ── add-task modal / wizard ─────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  z-index: 30;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-sheet {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 20px);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+
+.modal-title {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.modal-icon-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wizard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+
+.wizard-option-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.wizard-option-card:active {
+  background: var(--surface-2);
+}
+
+.wizard-option-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.wizard-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-option-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wizard-option-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.wizard-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.wizard-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  outline: none;
+  font-family: inherit;
+  color-scheme: light;
+}
+
+.wizard-input:focus {
+  border-color: var(--accent);
+}
+
+.wizard-submit-btn {
+  margin-top: 10px;
+  width: 100%;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.wizard-submit-btn:disabled {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.category-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.category-picker-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.category-picker-btn.selected {
+  border-color: var(--cat-color);
+  color: var(--cat-color);
+  background: color-mix(in srgb, var(--cat-color) 16%, var(--surface));
+}
+
+.cp-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cp-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.day-toggle-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.day-chip {
+  flex: 1;
+  min-width: 38px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.day-chip.selected {
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 25%, var(--surface));
+}

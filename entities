@@ -1,0 +1,9 @@
+categories
+    suplements, gym, food, work, education, reading, selfcare, important
+
+    categories can have colors, let's use unique color for each category and icon
+
+tasks
+    one time (this will only have label, we can do this type of tasks when we want and it will be moved to done)
+    event (this will have exact time, for example I have an interview I set this do not forget, or I have to visit doctor in concrete day)
+    repeatitive (here we can set repeat by days, repead in week (for example select all days but sunday and saturday, or monday wednesday, friday), monthly (here we should set day of month, for example 1th day of each month), hourly (here we should define first time hour, for example 9:00 and define how much time, it will show automatically last time such as 20:00, this is useful to do some excercises, or drink water)

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Daily Tasks</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f3f4f6">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tasks">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<link rel="stylesheet" href="styles.css?v=8">
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Daily Tasks</h1>
+  <p class="task-count" id="task-count"></p>
+</header>
+
+<main id="app">
+  <div id="category-tabs" class="category-tabs"></div>
+
+  <div id="category-pages" class="category-pages"></div>
+
+  <p id="empty-state" class="empty-state" hidden>No tasks yet. Tap + to add one.</p>
+
+  <button id="clear-done-btn" class="clear-done-btn" type="button" hidden>Clear completed</button>
+</main>
+
+<button id="fab-add" class="fab" type="button" aria-label="Add task">+</button>
+
+<div id="add-modal" class="modal-overlay" hidden>
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <button id="wizard-back" class="modal-icon-btn" type="button" aria-label="Back" hidden>‹</button>
+      <span id="wizard-title" class="modal-title"></span>
+      <button id="wizard-close" class="modal-icon-btn" type="button" aria-label="Close">×</button>
+    </div>
+    <div id="wizard-content" class="wizard-content"></div>
+  </div>
+</div>
+
+<script src="app.js?v=4"></script>
+</body>
+</html>
