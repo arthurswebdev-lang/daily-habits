@@ -66,7 +66,10 @@ let tasks = [
   { id: "seed-11", type: "repetitive", label: "Pay rent", category: "work",
     recurrence: { kind: "monthly", dayOfMonth: 1 }, done: false },
   { id: "seed-12", type: "repetitive", label: "Drink water", category: "selfcare",
-    recurrence: { kind: "hourly", start: "09:00", intervalHours: 2, end: "20:00" }, done: false },
+    recurrence: { kind: "daily", start: "09:00", intervalHours: 2, end: "20:00" },
+    subtasks: ["09:00", "11:00", "13:00", "15:00", "17:00", "19:00"].map((time, i) => ({
+      id: `seed-12-${i}`, label: time, done: i < 2,
+    })) },
 ];
 
 const categoryTabs = document.getElementById("category-tabs");
@@ -97,6 +100,24 @@ function progressOf(task) {
   return Math.round((doneCount / task.subtasks.length) * 100);
 }
 
+// A "daily" recurrence (repeat every N hours between a start and end time)
+// is tracked as one checkable slot per time-of-day, reusing the subtasks
+// mechanism — otherwise a single checkbox would mark the whole day's worth
+// of check-ins done after the very first one.
+function generateDailySlots({ start, intervalHours, end }) {
+  const toMinutes = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const startMin = toMinutes(start);
+  const endMin = toMinutes(end);
+  const stepMin = intervalHours * 60;
+  const slots = [];
+  for (let t = startMin; t <= endMin; t += stepMin) {
+    const h = String(Math.floor(t / 60)).padStart(2, "0");
+    const m = String(t % 60).padStart(2, "0");
+    slots.push(`${h}:${m}`);
+  }
+  return slots;
+}
+
 function formatEventMeta(task) {
   const dt = new Date(`${task.date}T${task.time}`);
   const date = dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -112,7 +133,7 @@ function formatRecurrenceMeta(recurrence) {
   if (recurrence.kind === "monthly") {
     return `Day ${recurrence.dayOfMonth} of month`;
   }
-  return `${recurrence.start}–${recurrence.end} · every ${recurrence.intervalHours}h`;
+  return `${recurrence.start}–${recurrence.end} · every ${recurrence.intervalHours}h`; // daily
 }
 
 // ── rendering ────────────────────────────────────────────────────────────
@@ -345,7 +366,7 @@ const STEP_TITLES = {
   repeatType: "Repeating task",
   weekly: "Repeat weekly",
   monthly: "Repeat monthly",
-  hourly: "Repeat hourly",
+  daily: "Repeat daily",
 };
 
 const BACK_STEP = {
@@ -354,7 +375,7 @@ const BACK_STEP = {
   repeatType: "type",
   weekly: "repeatType",
   monthly: "repeatType",
-  hourly: "repeatType",
+  daily: "repeatType",
 };
 
 let wizard = { step: "type" };
@@ -463,7 +484,7 @@ function renderStepRepeatType() {
   wizardContent.append(
     renderOptionCard("📆", "Weekly", "Pick which days of the week it repeats on.", () => goToStep("weekly")),
     renderOptionCard("🗓️", "Monthly", "Repeats on a specific day of the month.", () => goToStep("monthly")),
-    renderOptionCard("⏱️", "Hourly", "Repeats every few hours between a start and end time.", () => goToStep("hourly"))
+    renderOptionCard("⏱️", "Daily", "Repeats every few hours between a start and end time.", () => goToStep("daily"))
   );
 }
 
@@ -588,10 +609,12 @@ function renderStepMonthly() {
   );
 }
 
-function renderStepHourly() {
+function renderStepDaily() {
   const data = { label: "", category: null, start: "09:00", intervalHours: 2, end: "20:00" };
   const submitBtn = renderSubmitButton("Add task", () => {
-    tasks.push({ id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "hourly", start: data.start, intervalHours: data.intervalHours, end: data.end }, done: false });
+    const recurrence = { kind: "daily", start: data.start, intervalHours: data.intervalHours, end: data.end };
+    const subtasks = generateDailySlots(recurrence).map((time, i) => ({ id: `${crypto.randomUUID()}-${i}`, label: time, done: false }));
+    tasks.push({ id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence, subtasks });
     closeWizard();
     render();
   });
@@ -639,7 +662,7 @@ const STEP_RENDERERS = {
   event: renderStepEvent,
   weekly: renderStepWeekly,
   monthly: renderStepMonthly,
-  hourly: renderStepHourly,
+  daily: renderStepDaily,
 };
 
 function renderWizard() {
@@ -655,6 +678,86 @@ wizardBack.addEventListener("click", () => goToStep(BACK_STEP[wizard.step]));
 modalOverlay.addEventListener("click", (event) => {
   if (event.target === modalOverlay) closeWizard();
 });
+
+// ── foreground sound alerts ─────────────────────────────────────────────
+// Only fires while this tab/app is open — there is no background alarm
+// without native local notifications or a push server (see entities.md).
+// Plays for: events at their date+time, and daily-recurrence slots at their
+// time-of-day, each at most once per item.
+
+let audioCtx = null;
+function unlockAudio() {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+document.addEventListener("click", unlockAudio, { once: true });
+document.addEventListener("touchstart", unlockAudio, { once: true });
+
+function playAlertSound() {
+  unlockAudio();
+  const now = audioCtx.currentTime;
+  for (let i = 0; i < 2; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    const t = now + i * 0.35;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.32);
+  }
+}
+
+const alertedKeys = new Set();
+
+function dueEventKeys(nowDate) {
+  const keys = [];
+  for (const task of tasks) {
+    if (task.type !== "event" || task.done) continue;
+    const key = `event:${task.id}`;
+    if (alertedKeys.has(key)) continue;
+    if (new Date(`${task.date}T${task.time}`) <= nowDate) keys.push(key);
+  }
+  return keys;
+}
+
+function dueSlotKeys(nowMinutes) {
+  const keys = [];
+  for (const task of tasks) {
+    if (task.type !== "repetitive" || task.recurrence?.kind !== "daily" || !hasSubtasks(task)) continue;
+    for (const sub of task.subtasks) {
+      if (sub.done) continue;
+      const key = `slot:${task.id}:${sub.id}`;
+      if (alertedKeys.has(key)) continue;
+      const [h, m] = sub.label.split(":").map(Number);
+      if (h * 60 + m <= nowMinutes) keys.push(key);
+    }
+  }
+  return keys;
+}
+
+// Don't alarm retroactively for things already due when the app loads —
+// only for ones whose time arrives while the app stays open.
+function silenceAlreadyDueAlerts() {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  for (const key of [...dueEventKeys(now), ...dueSlotKeys(nowMinutes)]) alertedKeys.add(key);
+}
+
+function checkDueAlerts() {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const due = [...dueEventKeys(now), ...dueSlotKeys(nowMinutes)];
+  if (due.length === 0) return;
+  for (const key of due) alertedKeys.add(key);
+  playAlertSound();
+}
+
+silenceAlreadyDueAlerts();
+setInterval(checkDueAlerts, 20000);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));

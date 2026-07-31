@@ -84,18 +84,22 @@ A task that recurs on a schedule. Has one of these recurrence modes:
 2. **Monthly by day-of-month** — repeats on a specific day number each month
    (e.g. the 1st of every month). Open question: what happens in shorter
    months if the day is set to 30/31?
-3. **Hourly interval** — repeats throughout the day starting at a first time
-   (e.g. 9:00) and repeating every N hours until an implicit/explicit last
-   time (e.g. last occurrence ≤ 20:00, so 9:00 → 11:00 → ... → 19:00 if
-   interval is 2h). Useful for things like "drink water" or "stretch."
-   Open question: should the end time be explicit (you set both start and
-   end, and we derive the count) or derived only from the interval?
+3. **Daily interval** — repeats throughout the day starting at a first time
+   (e.g. 9:00) and repeating every N hours until an explicit end time (e.g.
+   9:00 → 11:00 → ... → 19:00 for a 2h interval ending at 20:00). Useful for
+   things like "drink water" or "stretch."
+   Each interval is generated as its own checkable slot (reusing the
+   subtasks mechanism — see below) rather than one flat done flag, so
+   checking off 9:00 doesn't mark the whole day done; progress shows as
+   e.g. "2/6 · 33%" until every slot for the day is checked.
 
-- Fields: `label`, `category`, `recurrence` (`{ type: "weekly" | "monthly" |
-  "hourly", ...type-specific fields }`), plus per-day/per-occurrence
-  completion state (a repetitive task's "done" resets each cycle, unlike
-  one-time/event which are done once and stay done).
+- Fields: `label`, `category`, `recurrence` (`{ kind: "weekly" | "monthly" |
+  "daily", ...type-specific fields }`). Weekly/monthly still use a single
+  `done` flag per ticket (no reset logic yet — see open question below);
+  daily auto-generates its per-slot `subtasks` at creation time.
 
-Open question for all recurring tasks: when a recurring instance is marked
-done, does it just reset next cycle, or do we keep a history (streak /
-completion log) you can look back on?
+Open question for weekly/monthly recurring tasks: when marked done, does it
+just reset next cycle, or do we keep a history (streak / completion log) you
+can look back on? (Daily's per-slot subtasks reset today only when the app
+reloads — there's no actual day-rollover mechanism yet either, since
+everything is still in-memory only.)
