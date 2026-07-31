@@ -70,6 +70,34 @@ let tasks = [
     subtasks: ["09:00", "11:00", "13:00", "15:00", "17:00", "19:00"].map((time, i) => ({
       id: `seed-12-${i}`, label: time, done: i < 2,
     })) },
+
+  { id: "seed-13", type: "one-time", label: "Reply to client emails", category: "work", done: false },
+  { id: "seed-14", type: "event", label: "Team standup", category: "work", date: "2026-07-31", time: "10:00", done: false },
+  { id: "seed-15", type: "repetitive", label: "Weekly report", category: "work",
+    recurrence: { kind: "weekly", days: ["mon"] }, done: false },
+
+  { id: "seed-16", type: "one-time", label: "Cardio session", category: "gym", done: true },
+  { id: "seed-17", type: "one-time", label: "Stretch routine", category: "gym", done: false },
+
+  { id: "seed-18", type: "one-time", label: "Skincare routine", category: "selfcare", done: false },
+  { id: "seed-19", type: "one-time", label: "Journal before bed", category: "selfcare", done: false },
+
+  { id: "seed-20", type: "one-time", label: "Grocery shopping", category: "food", done: false },
+  { id: "seed-21", type: "one-time", label: "Try new recipe", category: "food", done: true },
+
+  { id: "seed-22", type: "one-time", label: "Finish chapter 5", category: "reading", done: false },
+  { id: "seed-23", type: "one-time", label: "Buy new book", category: "reading", done: false },
+
+  { id: "seed-24", type: "one-time", label: "Order more vitamins", category: "supplements", done: false },
+
+  { id: "seed-25", type: "one-time", label: "Watch lecture video", category: "education", done: false },
+  { id: "seed-26", type: "event", label: "Submit assignment", category: "education", date: "2026-08-10", time: "09:00", done: false },
+
+  { id: "seed-27", type: "one-time", label: "Car insurance renewal", category: "important", done: false },
+  { id: "seed-28", type: "one-time", label: "Call the bank", category: "important", done: true },
+
+  { id: "seed-29", type: "one-time", label: "Random errand", done: false },
+  { id: "seed-30", type: "one-time", label: "Fix the fence", done: false },
 ];
 
 const categoryTabs = document.getElementById("category-tabs");
@@ -489,7 +517,7 @@ function renderStepRepeatType() {
 }
 
 function renderStepOneTime() {
-  const data = { label: "", category: null };
+  const data = { label: "", category: activeCategory };
   const submitBtn = renderSubmitButton("Add task", () => {
     tasks.push({ id: crypto.randomUUID(), type: "one-time", label: data.label.trim(), category: data.category || NONE_KEY, done: false });
     closeWizard();
@@ -501,14 +529,14 @@ function renderStepOneTime() {
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Call the plumber", (v) => { data.label = v; updateReady(); }),
     renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(null, (key) => { data.category = key; updateReady(); }),
+    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     submitBtn
   );
 }
 
 function renderStepEvent() {
   const today = new Date().toISOString().slice(0, 10);
-  const data = { label: "", category: null, date: today, time: "09:00" };
+  const data = { label: "", category: activeCategory, date: today, time: "09:00" };
   const submitBtn = renderSubmitButton("Add event", () => {
     tasks.push({ id: crypto.randomUUID(), type: "event", label: data.label.trim(), category: data.category || NONE_KEY, date: data.date, time: data.time, done: false });
     closeWizard();
@@ -532,7 +560,7 @@ function renderStepEvent() {
     renderFieldLabel("Event name"),
     renderLabelInput("e.g. Doctor's appointment", (v) => { data.label = v; updateReady(); }),
     renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(null, (key) => { data.category = key; updateReady(); }),
+    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Date"),
     dateInput,
     renderFieldLabel("Time"),
@@ -542,7 +570,7 @@ function renderStepEvent() {
 }
 
 function renderStepWeekly() {
-  const data = { label: "", category: null, days: [] };
+  const data = { label: "", category: activeCategory, days: [] };
   const submitBtn = renderSubmitButton("Add task", () => {
     tasks.push({ id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "weekly", days: [...data.days] }, done: false });
     closeWizard();
@@ -574,7 +602,7 @@ function renderStepWeekly() {
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Gym session", (v) => { data.label = v; updateReady(); }),
     renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(null, (key) => { data.category = key; updateReady(); }),
+    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Repeat on"),
     dayRow,
     submitBtn
@@ -582,7 +610,7 @@ function renderStepWeekly() {
 }
 
 function renderStepMonthly() {
-  const data = { label: "", category: null, dayOfMonth: 1 };
+  const data = { label: "", category: activeCategory, dayOfMonth: 1 };
   const submitBtn = renderSubmitButton("Add task", () => {
     tasks.push({ id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "monthly", dayOfMonth: data.dayOfMonth }, done: false });
     closeWizard();
@@ -602,7 +630,7 @@ function renderStepMonthly() {
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Pay rent", (v) => { data.label = v; updateReady(); }),
     renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(null, (key) => { data.category = key; updateReady(); }),
+    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Day of month"),
     dayInput,
     submitBtn
@@ -610,7 +638,7 @@ function renderStepMonthly() {
 }
 
 function renderStepDaily() {
-  const data = { label: "", category: null, start: "09:00", intervalHours: 2, end: "20:00" };
+  const data = { label: "", category: activeCategory, start: "09:00", intervalHours: 2, end: "20:00" };
   const submitBtn = renderSubmitButton("Add task", () => {
     const recurrence = { kind: "daily", start: data.start, intervalHours: data.intervalHours, end: data.end };
     const subtasks = generateDailySlots(recurrence).map((time, i) => ({ id: `${crypto.randomUUID()}-${i}`, label: time, done: false }));
@@ -644,7 +672,7 @@ function renderStepDaily() {
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Drink water", (v) => { data.label = v; updateReady(); }),
     renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(null, (key) => { data.category = key; updateReady(); }),
+    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Start time"),
     startInput,
     renderFieldLabel("Repeat every (hours)"),
@@ -690,8 +718,25 @@ function unlockAudio() {
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
+function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
 document.addEventListener("click", unlockAudio, { once: true });
 document.addEventListener("touchstart", unlockAudio, { once: true });
+document.addEventListener("click", requestNotificationPermission, { once: true });
+document.addEventListener("touchstart", requestNotificationPermission, { once: true });
+
+function showAlertNotification(title, body) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    new Notification(title, { body, icon: "icons/icon-192.png" });
+  } catch (e) {
+    // Some browsers (notably iOS Safari outside an installed PWA) throw
+    // rather than support the Notification constructor — sound still fires.
+  }
+}
 
 function playAlertSound() {
   unlockAudio();
@@ -713,19 +758,21 @@ function playAlertSound() {
 
 const alertedKeys = new Set();
 
-function dueEventKeys(nowDate) {
-  const keys = [];
+function dueEvents(nowDate) {
+  const due = [];
   for (const task of tasks) {
     if (task.type !== "event" || task.done) continue;
     const key = `event:${task.id}`;
     if (alertedKeys.has(key)) continue;
-    if (new Date(`${task.date}T${task.time}`) <= nowDate) keys.push(key);
+    if (new Date(`${task.date}T${task.time}`) <= nowDate) {
+      due.push({ key, title: task.label, body: "Event is due now" });
+    }
   }
-  return keys;
+  return due;
 }
 
-function dueSlotKeys(nowMinutes) {
-  const keys = [];
+function dueSlots(nowMinutes) {
+  const due = [];
   for (const task of tasks) {
     if (task.type !== "repetitive" || task.recurrence?.kind !== "daily" || !hasSubtasks(task)) continue;
     for (const sub of task.subtasks) {
@@ -733,10 +780,12 @@ function dueSlotKeys(nowMinutes) {
       const key = `slot:${task.id}:${sub.id}`;
       if (alertedKeys.has(key)) continue;
       const [h, m] = sub.label.split(":").map(Number);
-      if (h * 60 + m <= nowMinutes) keys.push(key);
+      if (h * 60 + m <= nowMinutes) {
+        due.push({ key, title: task.label, body: `Check-in at ${sub.label}` });
+      }
     }
   }
-  return keys;
+  return due;
 }
 
 // Don't alarm retroactively for things already due when the app loads —
@@ -744,15 +793,18 @@ function dueSlotKeys(nowMinutes) {
 function silenceAlreadyDueAlerts() {
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  for (const key of [...dueEventKeys(now), ...dueSlotKeys(nowMinutes)]) alertedKeys.add(key);
+  for (const item of [...dueEvents(now), ...dueSlots(nowMinutes)]) alertedKeys.add(item.key);
 }
 
 function checkDueAlerts() {
   const now = new Date();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const due = [...dueEventKeys(now), ...dueSlotKeys(nowMinutes)];
+  const due = [...dueEvents(now), ...dueSlots(nowMinutes)];
   if (due.length === 0) return;
-  for (const key of due) alertedKeys.add(key);
+  for (const item of due) {
+    alertedKeys.add(item.key);
+    showAlertNotification(item.title, item.body);
+  }
   playAlertSound();
 }
 

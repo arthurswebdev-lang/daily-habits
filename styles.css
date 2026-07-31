@@ -115,7 +115,7 @@ body {
   flex: 0 0 100%;
   max-width: 100%;
   scroll-snap-align: start;
-  padding: 0 16px calc(env(safe-area-inset-bottom) + 100px);
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 84px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -331,6 +331,10 @@ body {
   color: var(--text-dim);
   font-size: 14px;
   margin: 0 16px;
+}
+
+.empty-state[hidden] {
+  display: none;
 }
 
 .clear-done-btn {

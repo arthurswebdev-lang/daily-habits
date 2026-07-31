@@ -1,4 +1,4 @@
-const CACHE_NAME = "daily-tasks-cache-v7"; // bump on every deploy to force refresh
+const CACHE_NAME = "daily-tasks-cache-v9"; // bump on every deploy to force refresh
 const ASSETS = [
   "./",
   "./index.html",
