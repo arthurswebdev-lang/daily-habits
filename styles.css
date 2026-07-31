@@ -9,6 +9,7 @@
   --done: #16a34a;
   --danger: #b91c1c;
   --on-color: #14171a;
+  --fab-add: #ffdf00;
 }
 
 * {
@@ -22,14 +23,18 @@ html, body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  height: 100%;
 }
 
 body {
-  min-height: 100vh;
-  padding-bottom: env(safe-area-inset-bottom);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
 }
 
 .app-header {
+  flex-shrink: 0;
   padding: calc(env(safe-area-inset-top) + 20px) 20px 16px;
   text-align: center;
   border-bottom: 1px solid var(--border);
@@ -48,14 +53,20 @@ body {
 }
 
 #app {
+  flex: 1;
+  min-height: 0;
   max-width: 480px;
+  width: 100%;
   margin: 0 auto;
-  padding: 20px 0 calc(env(safe-area-inset-bottom) + 96px);
+  padding: 20px 0 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── category tabs (jump to a page) ──────────────────────────────────── */
 
 .category-tabs {
+  flex-shrink: 0;
   display: flex;
   gap: 10px;
   overflow-x: auto;
@@ -87,6 +98,8 @@ body {
 /* ── swipeable category pages ────────────────────────────────────────── */
 
 .category-pages {
+  flex: 1;
+  min-height: 0;
   display: flex;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -102,7 +115,9 @@ body {
   flex: 0 0 100%;
   max-width: 100%;
   scroll-snap-align: start;
-  padding: 0 16px;
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 100px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .category-section {
@@ -308,26 +323,36 @@ body {
 }
 
 .empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   color: var(--text-dim);
   font-size: 14px;
-  margin: 40px 16px 0;
+  margin: 0 16px;
 }
 
 .clear-done-btn {
-  display: block;
-  margin: 20px 16px 0;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: 14px;
-  padding: 12px;
-  border-radius: 10px;
+  position: fixed;
+  left: 20px;
+  bottom: calc(env(safe-area-inset-bottom) + 20px);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 20;
 }
 
 .clear-done-btn:active {
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
 /* ── floating add button ─────────────────────────────────────────────── */
@@ -340,12 +365,12 @@ body {
   height: 56px;
   border-radius: 50%;
   border: none;
-  background: var(--accent);
-  color: #fff;
+  background: var(--fab-add);
+  color: var(--on-color);
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   z-index: 20;
 }
 
