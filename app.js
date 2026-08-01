@@ -112,10 +112,19 @@ function progressOf(task) {
   return Math.round((doneCount / task.subtasks.length) * 100);
 }
 
+// Builds {id,label,done} subtask records from plain label strings, keeping
+// a subtask "done" if a subtask with the same label was already done
+// before (so editing a task's other fields doesn't reset its checklist).
+function subtasksFromLabels(labels, idPrefix, previousSubtasks) {
+  const prevByLabel = new Map((previousSubtasks || []).map((s) => [s.label, s.done]));
+  return labels.map((label, i) => ({ id: `${idPrefix}-${i}`, label, done: prevByLabel.get(label) || false }));
+}
+
 // A "daily" recurrence (repeat every N hours between a start and end time)
 // is tracked as one checkable slot per time-of-day, reusing the subtasks
 // mechanism — otherwise a single checkbox would mark the whole day's worth
-// of check-ins done after the very first one.
+// of check-ins done after the very first one. `isSlot` distinguishes
+// auto-generated time slots from any extra subtasks the user adds on top.
 function generateDailySlots({ start, intervalHours, end }) {
   const toMinutes = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const startMin = toMinutes(start);
@@ -130,8 +139,9 @@ function generateDailySlots({ start, intervalHours, end }) {
   return slots;
 }
 
-function makeDailySubtasks(taskId, recurrence) {
-  return generateDailySlots(recurrence).map((time, i) => ({ id: `${taskId}-${i}`, label: time, done: false }));
+function makeDailySubtasks(taskId, recurrence, previousSubtasks) {
+  const slots = subtasksFromLabels(generateDailySlots(recurrence), `${taskId}-slot`, previousSubtasks);
+  return slots.map((s) => ({ ...s, isSlot: true }));
 }
 
 function todayDateString() {
@@ -142,14 +152,16 @@ function todayDateString() {
 // Now that tasks persist (IndexedDB), a checked-off daily slot would
 // otherwise stay checked forever — this regenerates a fresh, unchecked set
 // of slots whenever the calendar day has moved on since they were last
-// generated, so "daily" recurrence actually resets daily.
+// generated, so "daily" recurrence actually resets daily. Any extra
+// (non-slot) subtasks the user added are left untouched.
 function refreshDailyRecurrences() {
   const today = todayDateString();
   let changed = false;
   for (const task of tasks) {
     if (task.type !== "repetitive" || task.recurrence?.kind !== "daily") continue;
     if (task.recurrence.lastGeneratedDate === today) continue;
-    task.subtasks = makeDailySubtasks(task.id, task.recurrence);
+    const extras = (task.subtasks || []).filter((s) => !s.isSlot);
+    task.subtasks = [...makeDailySubtasks(task.id, task.recurrence, task.subtasks), ...extras];
     task.recurrence.lastGeneratedDate = today;
     putTask(task);
     changed = true;
@@ -175,67 +187,6 @@ function formatRecurrenceMeta(recurrence) {
   return `${recurrence.start}–${recurrence.end} · every ${recurrence.intervalHours}h`; // daily
 }
 
-// ── calendar export (.ics) ───────────────────────────────────────────────
-// Lets iOS/Android's own Calendar app own the actual alarm — the browser
-// can't write events silently, but opening this file prompts one native
-// "Add to Calendar" confirmation, no manual data entry required.
-
-function icsEscape(text) {
-  return String(text).replace(/[\\;,]/g, (m) => "\\" + m).replace(/\n/g, "\\n");
-}
-
-function icsDateTime(date) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T${pad(date.getHours())}${pad(date.getMinutes())}00`;
-}
-
-function icsVevent({ uid, start, summary, rrule }) {
-  return [
-    "BEGIN:VEVENT",
-    `UID:${uid}@daily-tasks`,
-    `DTSTAMP:${icsDateTime(new Date())}`,
-    `DTSTART:${icsDateTime(start)}`,
-    rrule ? `RRULE:${rrule}` : null,
-    `SUMMARY:${icsEscape(summary)}`,
-    "BEGIN:VALARM",
-    "ACTION:DISPLAY",
-    "DESCRIPTION:Reminder",
-    "TRIGGER:PT0M",
-    "END:VALARM",
-    "END:VEVENT",
-  ].filter(Boolean).join("\r\n");
-}
-
-function buildTaskICS(task) {
-  if (task.type === "event") {
-    return [icsVevent({ uid: task.id, start: new Date(`${task.date}T${task.time}`), summary: task.label })];
-  }
-  // repetitive/daily: one recurring (FREQ=DAILY) event per time-of-day slot
-  const today = new Date();
-  return task.subtasks.map((sub) => {
-    const [h, m] = sub.label.split(":").map(Number);
-    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m);
-    return icsVevent({ uid: `${task.id}-${sub.id}`, start, summary: `${task.label} (${sub.label})`, rrule: "FREQ=DAILY" });
-  });
-}
-
-function downloadICS(filename, vevents) {
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Daily Tasks//EN", "CALSCALE:GREGORIAN", ...vevents, "END:VCALENDAR"].join("\r\n");
-  const blob = new Blob([ics], { type: "text/calendar" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function canExportToCalendar(task) {
-  return task.type === "event" || (task.type === "repetitive" && task.recurrence?.kind === "daily" && hasSubtasks(task));
-}
-
 // ── rendering ────────────────────────────────────────────────────────────
 
 function renderTaskItem(task) {
@@ -257,6 +208,17 @@ function renderTaskItem(task) {
   text.textContent = task.label;
   body.append(text);
 
+  const editBtn = document.createElement("button");
+  editBtn.className = "task-edit-btn";
+  editBtn.type = "button";
+  editBtn.setAttribute("aria-label", "Edit task");
+  editBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M5 19l1-4L15 6l4 4L10 19l-4 1z"></path>' +
+    '<line x1="14" y1="6" x2="18" y2="10"></line>' +
+    "</svg>";
+  editBtn.addEventListener("click", () => editTask(task.id));
+
   const del = document.createElement("button");
   del.className = "task-delete";
   del.type = "button";
@@ -265,22 +227,6 @@ function renderTaskItem(task) {
   del.addEventListener("click", () => {
     if (confirm(`Delete "${task.label}"?`)) removeTask(task.id);
   });
-
-  let calendarBtn = null;
-  if (canExportToCalendar(task)) {
-    calendarBtn = document.createElement("button");
-    calendarBtn.className = "task-calendar-btn";
-    calendarBtn.type = "button";
-    calendarBtn.setAttribute("aria-label", "Add to Calendar");
-    calendarBtn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<rect x="4" y="5" width="16" height="15" rx="2"></rect>' +
-      '<line x1="4" y1="9" x2="20" y2="9"></line>' +
-      '<line x1="8" y1="3" x2="8" y2="7"></line>' +
-      '<line x1="16" y1="3" x2="16" y2="7"></line>' +
-      "</svg>";
-    calendarBtn.addEventListener("click", () => downloadICS(`${task.label}.ics`, buildTaskICS(task)));
-  }
 
   if (hasSubtasks(task)) {
     const progress = progressOf(task);
@@ -339,9 +285,7 @@ function renderTaskItem(task) {
     }
   }
 
-  li.append(checkbox, body);
-  if (calendarBtn) li.append(calendarBtn);
-  li.append(del);
+  li.append(checkbox, body, editBtn, del);
   return li;
 }
 
@@ -478,7 +422,7 @@ clearDoneBtn.addEventListener("click", () => {
   if (confirm("Clear all completed tasks?")) clearCompleted();
 });
 
-// ── add-task wizard ──────────────────────────────────────────────────────
+// ── add-task / edit-task wizard ──────────────────────────────────────────
 
 const STEP_TITLES = {
   type: "Add task",
@@ -499,10 +443,19 @@ const BACK_STEP = {
   daily: "repeatType",
 };
 
-let wizard = { step: "type" };
+let wizard = { step: "type", editingTask: null };
 
 function openWizard() {
-  wizard = { step: "type" };
+  wizard = { step: "type", editingTask: null };
+  modalOverlay.hidden = false;
+  renderWizard();
+}
+
+function editTask(id) {
+  const task = tasks.find((t) => t.id === id);
+  if (!task) return;
+  const step = task.type === "one-time" ? "oneTime" : task.type === "event" ? "event" : task.recurrence.kind;
+  wizard = { step, editingTask: task };
   modalOverlay.hidden = false;
   renderWizard();
 }
@@ -510,11 +463,28 @@ function openWizard() {
 function closeWizard() {
   modalOverlay.hidden = true;
   wizardContent.innerHTML = "";
+  wizard = { step: "type", editingTask: null };
 }
 
 function goToStep(step) {
   wizard.step = step;
   renderWizard();
+}
+
+// Saves fields onto the task being edited, or creates a new task — the one
+// place that decides between updating in place vs. pushing a new record.
+function commitTask(id, fields) {
+  const editing = wizard.editingTask;
+  if (editing) {
+    Object.assign(editing, fields);
+    putTask(editing);
+  } else {
+    const task = { id, ...fields };
+    tasks.push(task);
+    putTask(task);
+  }
+  closeWizard();
+  render();
 }
 
 function renderCategoryPicker(selectedKey, onChange) {
@@ -545,12 +515,13 @@ function renderCategoryPicker(selectedKey, onChange) {
   return grid;
 }
 
-function renderLabelInput(placeholder, onInput) {
+function renderLabelInput(placeholder, onInput, value) {
   const input = document.createElement("input");
   input.type = "text";
   input.className = "wizard-input";
   input.placeholder = placeholder;
   input.maxLength = 200;
+  if (value) input.value = value;
   input.addEventListener("input", () => onInput(input.value));
   return input;
 }
@@ -593,6 +564,73 @@ function renderOptionCard(icon, title, desc, onClick) {
   return btn;
 }
 
+// A small checklist builder: type a step, tap + (or Enter) to add it, tap ×
+// to remove. `items` is a plain array of label strings, mutated in place.
+function renderSubtaskBuilder(items) {
+  const wrap = document.createElement("div");
+  wrap.className = "subtask-builder";
+
+  const list = document.createElement("ul");
+  list.className = "subtask-builder-list";
+
+  function renderList() {
+    list.innerHTML = "";
+    items.forEach((label, i) => {
+      const li = document.createElement("li");
+      li.className = "subtask-builder-item";
+
+      const span = document.createElement("span");
+      span.textContent = label;
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "subtask-builder-remove";
+      removeBtn.setAttribute("aria-label", "Remove step");
+      removeBtn.textContent = "×";
+      removeBtn.addEventListener("click", () => {
+        items.splice(i, 1);
+        renderList();
+      });
+
+      li.append(span, removeBtn);
+      list.appendChild(li);
+    });
+  }
+  renderList();
+
+  const addRow = document.createElement("div");
+  addRow.className = "subtask-builder-add-row";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "wizard-input";
+  input.placeholder = "Add a step…";
+  input.maxLength = 120;
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "subtask-builder-add-btn";
+  addBtn.setAttribute("aria-label", "Add step");
+  addBtn.textContent = "+";
+
+  function addItem() {
+    const v = input.value.trim();
+    if (!v) return;
+    items.push(v);
+    input.value = "";
+    renderList();
+    input.focus();
+  }
+  addBtn.addEventListener("click", addItem);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addItem(); }
+  });
+
+  addRow.append(input, addBtn);
+  wrap.append(list, addRow);
+  return wrap;
+}
+
 function renderStepType() {
   wizardContent.append(
     renderOptionCard("📌", "One-time", "Just a label — do it whenever, then it's done.", () => goToStep("oneTime")),
@@ -610,70 +648,94 @@ function renderStepRepeatType() {
 }
 
 function renderStepOneTime() {
-  const data = { label: "", category: activeCategory };
-  const submitBtn = renderSubmitButton("Add task", () => {
-    const task = { id: crypto.randomUUID(), type: "one-time", label: data.label.trim(), category: data.category || NONE_KEY, done: false };
-    tasks.push(task);
-    closeWizard();
-    render();
-    putTask(task);
+  const editing = wizard.editingTask;
+  const data = {
+    label: editing?.label || "",
+    category: editing?.category ?? activeCategory,
+    subtasks: (editing?.subtasks || []).map((s) => s.label),
+  };
+  const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add task", () => {
+    const id = editing ? editing.id : crypto.randomUUID();
+    const subtasks = data.subtasks.length ? subtasksFromLabels(data.subtasks, id, editing?.subtasks) : undefined;
+    const fields = { type: "one-time", label: data.label.trim(), category: data.category || NONE_KEY, subtasks };
+    if (!subtasks) fields.done = editing ? (editing.done ?? false) : false;
+    commitTask(id, fields);
   });
   const updateReady = () => { submitBtn.disabled = !data.label.trim(); };
 
   wizardContent.append(
     renderFieldLabel("Task name"),
-    renderLabelInput("e.g. Call the plumber", (v) => { data.label = v; updateReady(); }),
+    renderLabelInput("e.g. Call the plumber", (v) => { data.label = v; updateReady(); }, data.label),
     renderFieldLabel("Category (optional)"),
     renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
+    renderFieldLabel("Subtasks (optional)"),
+    renderSubtaskBuilder(data.subtasks),
     submitBtn
   );
+  updateReady();
 }
 
 function renderStepEvent() {
+  const editing = wizard.editingTask;
   const today = new Date().toISOString().slice(0, 10);
-  const data = { label: "", category: activeCategory, date: today, time: "09:00" };
-  const submitBtn = renderSubmitButton("Add event", () => {
-    const task = { id: crypto.randomUUID(), type: "event", label: data.label.trim(), category: data.category || NONE_KEY, date: data.date, time: data.time, done: false };
-    tasks.push(task);
-    closeWizard();
-    render();
-    putTask(task);
+  const data = {
+    label: editing?.label || "",
+    category: editing?.category ?? activeCategory,
+    date: editing?.date || today,
+    time: editing?.time || "09:00",
+    subtasks: (editing?.subtasks || []).map((s) => s.label),
+  };
+  const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add event", () => {
+    const id = editing ? editing.id : crypto.randomUUID();
+    const subtasks = data.subtasks.length ? subtasksFromLabels(data.subtasks, id, editing?.subtasks) : undefined;
+    const fields = { type: "event", label: data.label.trim(), category: data.category || NONE_KEY, date: data.date, time: data.time, subtasks };
+    if (!subtasks) fields.done = editing ? (editing.done ?? false) : false;
+    commitTask(id, fields);
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.date && data.time); };
 
   const dateInput = document.createElement("input");
   dateInput.type = "date";
   dateInput.className = "wizard-input";
-  dateInput.value = today;
+  dateInput.value = data.date;
   dateInput.addEventListener("input", () => { data.date = dateInput.value; updateReady(); });
 
   const timeInput = document.createElement("input");
   timeInput.type = "time";
   timeInput.className = "wizard-input";
-  timeInput.value = "09:00";
+  timeInput.value = data.time;
   timeInput.addEventListener("input", () => { data.time = timeInput.value; updateReady(); });
 
   wizardContent.append(
     renderFieldLabel("Event name"),
-    renderLabelInput("e.g. Doctor's appointment", (v) => { data.label = v; updateReady(); }),
+    renderLabelInput("e.g. Doctor's appointment", (v) => { data.label = v; updateReady(); }, data.label),
     renderFieldLabel("Category (optional)"),
     renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Date"),
     dateInput,
     renderFieldLabel("Time"),
     timeInput,
+    renderFieldLabel("Subtasks (optional)"),
+    renderSubtaskBuilder(data.subtasks),
     submitBtn
   );
+  updateReady();
 }
 
 function renderStepWeekly() {
-  const data = { label: "", category: activeCategory, days: [] };
-  const submitBtn = renderSubmitButton("Add task", () => {
-    const task = { id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "weekly", days: [...data.days] }, done: false };
-    tasks.push(task);
-    closeWizard();
-    render();
-    putTask(task);
+  const editing = wizard.editingTask;
+  const data = {
+    label: editing?.label || "",
+    category: editing?.category ?? activeCategory,
+    days: editing ? [...editing.recurrence.days] : [],
+    subtasks: (editing?.subtasks || []).map((s) => s.label),
+  };
+  const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add task", () => {
+    const id = editing ? editing.id : crypto.randomUUID();
+    const subtasks = data.subtasks.length ? subtasksFromLabels(data.subtasks, id, editing?.subtasks) : undefined;
+    const fields = { type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "weekly", days: [...data.days] }, subtasks };
+    if (!subtasks) fields.done = editing ? (editing.done ?? false) : false;
+    commitTask(id, fields);
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.days.length > 0); };
 
@@ -682,7 +744,7 @@ function renderStepWeekly() {
   for (const day of WEEKDAYS) {
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "day-chip";
+    chip.className = "day-chip" + (data.days.includes(day.key) ? " selected" : "");
     chip.textContent = day.label;
     chip.addEventListener("click", () => {
       if (data.days.includes(day.key)) {
@@ -699,23 +761,32 @@ function renderStepWeekly() {
 
   wizardContent.append(
     renderFieldLabel("Task name"),
-    renderLabelInput("e.g. Gym session", (v) => { data.label = v; updateReady(); }),
+    renderLabelInput("e.g. Gym session", (v) => { data.label = v; updateReady(); }, data.label),
     renderFieldLabel("Category (optional)"),
     renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Repeat on"),
     dayRow,
+    renderFieldLabel("Subtasks (optional)"),
+    renderSubtaskBuilder(data.subtasks),
     submitBtn
   );
+  updateReady();
 }
 
 function renderStepMonthly() {
-  const data = { label: "", category: activeCategory, dayOfMonth: 1 };
-  const submitBtn = renderSubmitButton("Add task", () => {
-    const task = { id: crypto.randomUUID(), type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "monthly", dayOfMonth: data.dayOfMonth }, done: false };
-    tasks.push(task);
-    closeWizard();
-    render();
-    putTask(task);
+  const editing = wizard.editingTask;
+  const data = {
+    label: editing?.label || "",
+    category: editing?.category ?? activeCategory,
+    dayOfMonth: editing?.recurrence.dayOfMonth || 1,
+    subtasks: (editing?.subtasks || []).map((s) => s.label),
+  };
+  const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add task", () => {
+    const id = editing ? editing.id : crypto.randomUUID();
+    const subtasks = data.subtasks.length ? subtasksFromLabels(data.subtasks, id, editing?.subtasks) : undefined;
+    const fields = { type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence: { kind: "monthly", dayOfMonth: data.dayOfMonth }, subtasks };
+    if (!subtasks) fields.done = editing ? (editing.done ?? false) : false;
+    commitTask(id, fields);
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.dayOfMonth >= 1 && data.dayOfMonth <= 31); };
 
@@ -724,37 +795,46 @@ function renderStepMonthly() {
   dayInput.className = "wizard-input";
   dayInput.min = "1";
   dayInput.max = "31";
-  dayInput.value = "1";
+  dayInput.value = String(data.dayOfMonth);
   dayInput.addEventListener("input", () => { data.dayOfMonth = Number(dayInput.value); updateReady(); });
 
   wizardContent.append(
     renderFieldLabel("Task name"),
-    renderLabelInput("e.g. Pay rent", (v) => { data.label = v; updateReady(); }),
+    renderLabelInput("e.g. Pay rent", (v) => { data.label = v; updateReady(); }, data.label),
     renderFieldLabel("Category (optional)"),
     renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Day of month"),
     dayInput,
+    renderFieldLabel("Subtasks (optional)"),
+    renderSubtaskBuilder(data.subtasks),
     submitBtn
   );
+  updateReady();
 }
 
 function renderStepDaily() {
-  const data = { label: "", category: activeCategory, start: "09:00", intervalHours: 2, end: "20:00" };
-  const submitBtn = renderSubmitButton("Add task", () => {
-    const id = crypto.randomUUID();
+  const editing = wizard.editingTask;
+  const data = {
+    label: editing?.label || "",
+    category: editing?.category ?? activeCategory,
+    start: editing?.recurrence.start || "09:00",
+    intervalHours: editing?.recurrence.intervalHours || 2,
+    end: editing?.recurrence.end || "20:00",
+    extraSubtasks: (editing?.subtasks || []).filter((s) => !s.isSlot).map((s) => s.label),
+  };
+  const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add task", () => {
+    const id = editing ? editing.id : crypto.randomUUID();
     const recurrence = { kind: "daily", start: data.start, intervalHours: data.intervalHours, end: data.end, lastGeneratedDate: todayDateString() };
-    const task = { id, type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence, subtasks: makeDailySubtasks(id, recurrence) };
-    tasks.push(task);
-    closeWizard();
-    render();
-    putTask(task);
+    const slotSubtasks = makeDailySubtasks(id, recurrence, editing?.subtasks);
+    const extraSubtasks = subtasksFromLabels(data.extraSubtasks, `${id}-extra`, editing?.subtasks);
+    commitTask(id, { type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence, subtasks: [...slotSubtasks, ...extraSubtasks] });
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.start && data.end && data.intervalHours > 0); };
 
   const startInput = document.createElement("input");
   startInput.type = "time";
   startInput.className = "wizard-input";
-  startInput.value = "09:00";
+  startInput.value = data.start;
   startInput.addEventListener("input", () => { data.start = startInput.value; updateReady(); });
 
   const intervalInput = document.createElement("input");
@@ -762,18 +842,18 @@ function renderStepDaily() {
   intervalInput.className = "wizard-input";
   intervalInput.min = "1";
   intervalInput.max = "12";
-  intervalInput.value = "2";
+  intervalInput.value = String(data.intervalHours);
   intervalInput.addEventListener("input", () => { data.intervalHours = Number(intervalInput.value); updateReady(); });
 
   const endInput = document.createElement("input");
   endInput.type = "time";
   endInput.className = "wizard-input";
-  endInput.value = "20:00";
+  endInput.value = data.end;
   endInput.addEventListener("input", () => { data.end = endInput.value; updateReady(); });
 
   wizardContent.append(
     renderFieldLabel("Task name"),
-    renderLabelInput("e.g. Drink water", (v) => { data.label = v; updateReady(); }),
+    renderLabelInput("e.g. Drink water", (v) => { data.label = v; updateReady(); }, data.label),
     renderFieldLabel("Category (optional)"),
     renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Start time"),
@@ -782,8 +862,11 @@ function renderStepDaily() {
     intervalInput,
     renderFieldLabel("Until"),
     endInput,
+    renderFieldLabel("Extra steps (optional)"),
+    renderSubtaskBuilder(data.extraSubtasks),
     submitBtn
   );
+  updateReady();
 }
 
 const STEP_RENDERERS = {
@@ -798,8 +881,9 @@ const STEP_RENDERERS = {
 
 function renderWizard() {
   wizardContent.innerHTML = "";
-  wizardTitle.textContent = STEP_TITLES[wizard.step];
-  wizardBack.hidden = !(wizard.step in BACK_STEP);
+  const editing = wizard.editingTask;
+  wizardTitle.textContent = (editing ? "Edit: " : "") + STEP_TITLES[wizard.step];
+  wizardBack.hidden = editing ? true : !(wizard.step in BACK_STEP);
   STEP_RENDERERS[wizard.step]();
 }
 
@@ -810,116 +894,13 @@ modalOverlay.addEventListener("click", (event) => {
   if (event.target === modalOverlay) closeWizard();
 });
 
-// ── foreground sound alerts ─────────────────────────────────────────────
-// Only fires while this tab/app is open — there is no background alarm
-// without native local notifications or a push server (see entities.md).
-// Plays for: events at their date+time, and daily-recurrence slots at their
-// time-of-day, each at most once per item.
-
-let audioCtx = null;
-function unlockAudio() {
-  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === "suspended") audioCtx.resume();
-}
-function requestNotificationPermission() {
-  if ("Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission();
-  }
-}
-document.addEventListener("click", unlockAudio, { once: true });
-document.addEventListener("touchstart", unlockAudio, { once: true });
-document.addEventListener("click", requestNotificationPermission, { once: true });
-document.addEventListener("touchstart", requestNotificationPermission, { once: true });
-
-function showAlertNotification(title, body) {
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-  try {
-    new Notification(title, { body, icon: "icons/icon-192.png" });
-  } catch (e) {
-    // Some browsers (notably iOS Safari outside an installed PWA) throw
-    // rather than support the Notification constructor — sound still fires.
-  }
-}
-
-function playAlertSound() {
-  unlockAudio();
-  const now = audioCtx.currentTime;
-  for (let i = 0; i < 2; i++) {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    const t = now + i * 0.35;
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + 0.32);
-  }
-}
-
-const alertedKeys = new Set();
-
-function dueEvents(nowDate) {
-  const due = [];
-  for (const task of tasks) {
-    if (task.type !== "event" || task.done) continue;
-    const key = `event:${task.id}`;
-    if (alertedKeys.has(key)) continue;
-    if (new Date(`${task.date}T${task.time}`) <= nowDate) {
-      due.push({ key, title: task.label, body: "Event is due now" });
-    }
-  }
-  return due;
-}
-
-function dueSlots(nowMinutes) {
-  const due = [];
-  for (const task of tasks) {
-    if (task.type !== "repetitive" || task.recurrence?.kind !== "daily" || !hasSubtasks(task)) continue;
-    for (const sub of task.subtasks) {
-      if (sub.done) continue;
-      const key = `slot:${task.id}:${sub.id}`;
-      if (alertedKeys.has(key)) continue;
-      const [h, m] = sub.label.split(":").map(Number);
-      if (h * 60 + m <= nowMinutes) {
-        due.push({ key, title: task.label, body: `Check-in at ${sub.label}` });
-      }
-    }
-  }
-  return due;
-}
-
-// Don't alarm retroactively for things already due when the app loads —
-// only for ones whose time arrives while the app stays open.
-function silenceAlreadyDueAlerts() {
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  for (const item of [...dueEvents(now), ...dueSlots(nowMinutes)]) alertedKeys.add(item.key);
-}
-
-function checkDueAlerts() {
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const due = [...dueEvents(now), ...dueSlots(nowMinutes)];
-  if (due.length === 0) return;
-  for (const item of due) {
-    alertedKeys.add(item.key);
-    showAlertNotification(item.title, item.body);
-  }
-  playAlertSound();
-}
-
 (async function init() {
   db = await openDB();
   tasks = await getAllTasks();
   refreshDailyRecurrences();
   render();
-  silenceAlreadyDueAlerts();
   setInterval(() => {
     if (refreshDailyRecurrences()) render();
-    checkDueAlerts();
   }, 20000);
 })();
 

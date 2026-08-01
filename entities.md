@@ -41,7 +41,11 @@ Notes:
 ## Subtasks
 
 Any task (of any type below) can optionally have a checklist of subtasks
-instead of a single done/not-done state:
+instead of a single done/not-done state. Every add-task form (one-time,
+event, weekly, monthly, daily) now has a "Subtasks" builder: type a step,
+tap + (or Enter) to add it, tap × to remove — resolved the earlier gap
+where subtasks existed in the data model but there was no way to actually
+add one from the UI.
 
 - Each subtask is just a label + its own done flag: `{ label, done }`.
 - When a task has subtasks, its own `done` is *derived*, not stored directly
@@ -51,10 +55,22 @@ instead of a single done/not-done state:
 - Progress is shown as a percentage (`doneCount / total`), e.g. "2/4 · 50%",
   with a ring/progress indicator taking the place of the plain checkbox.
 - A task with zero subtasks behaves exactly like today — a plain checkbox.
+- Daily recurrence's auto-generated time slots (see below) are subtasks
+  too, tagged `isSlot: true`; any extra steps you add on a daily task sit
+  alongside the time slots in the same checklist, but only the time slots
+  get regenerated each day — extra steps stay as you left them.
+- Subtasks can be added or removed later too, via editing the task (see
+  Editing below) — not just fixed at creation.
 
-Open question: should there be a way to add subtasks to a task after
-creation (an inline "+ add step" row), or are subtasks fixed once the task
-is created?
+## Editing
+
+Tap the pencil icon on any ticket to reopen the same form used to create
+it, pre-filled with its current values (label, category, date/time or
+recurrence schedule, subtasks). Saving updates the ticket in place.
+Editing does not change a ticket's fundamental type (e.g. you can't turn a
+one-time task into an event) — only its fields. Editing a task's other
+fields never resets an already-completed checkbox or checked-off subtask
+(matched back up by label).
 
 ## Task Types
 
