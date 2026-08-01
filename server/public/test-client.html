@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Push notifications — test client</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 480px; margin: 20px auto; padding: 0 16px; }
+  h1 { font-size: 18px; }
+  section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #ddd; }
+  button { display: block; width: 100%; padding: 10px; margin-top: 8px; font-size: 15px; }
+  input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+  #log { white-space: pre-wrap; background: #f2f2f2; padding: 10px; font-size: 12px; max-height: 200px; overflow-y: auto; }
+  code { font-size: 12px; word-break: break-all; }
+</style>
+</head>
+<body>
+  <h1>Push notification test client</h1>
+  <p>Not the main app — a standalone page to exercise the backend + Firebase
+  wiring end to end without touching the frontend yet.</p>
+
+  <section>
+    <strong>Device ID</strong> (auto-generated, stored in this browser):
+    <div><code id="device-id"></code></div>
+  </section>
+
+  <section>
+    <strong>1. Get an FCM token</strong>
+    <button id="btn-token">Request permission &amp; get token</button>
+    <div><code id="token-display">(none yet)</code></div>
+  </section>
+
+  <section>
+    <strong>2. Register this device with the server</strong>
+    <button id="btn-register">Register device</button>
+  </section>
+
+  <section>
+    <strong>3. Sync a test event</strong>
+    <label>Label<input id="task-label" value="Test reminder"></label>
+    <label>Fires in (minutes from now)<input id="task-minutes" type="number" value="1" min="0"></label>
+    <button id="btn-sync">Sync test task to server</button>
+  </section>
+
+  <section>
+    <strong>4. Force an immediate check</strong>
+    <p>The server checks every minute on its own — use this to skip the wait.</p>
+    <button id="btn-check">Force check now</button>
+  </section>
+
+  <section>
+    <strong>Log</strong>
+    <div id="log"></div>
+  </section>
+
+  <script src="firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+  <script>
+    const logEl = document.getElementById("log");
+    function log(msg) {
+      const line = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2);
+      logEl.textContent += line + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function getDeviceId() {
+      let id = localStorage.getItem("deviceId");
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("deviceId", id);
+      }
+      return id;
+    }
+    const deviceId = getDeviceId();
+    document.getElementById("device-id").textContent = deviceId;
+
+    if (!window.FIREBASE_CONFIG || window.FIREBASE_CONFIG.apiKey === "REPLACE_ME") {
+      log("⚠ firebase-config.js is missing or still has placeholder values — copy firebase-config.example.js to firebase-config.js and fill it in.");
+    }
+
+    firebase.initializeApp(window.FIREBASE_CONFIG || {});
+    const messaging = firebase.messaging();
+    messaging.onMessage((payload) => {
+      log("Foreground push received:");
+      log(payload);
+      const { title, body } = payload.notification || {};
+      alert(`${title || "Notification"}\n${body || ""}`);
+    });
+
+    let fcmToken = null;
+
+    document.getElementById("btn-token").addEventListener("click", async () => {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          log("Permission not granted: " + permission);
+          return;
+        }
+        fcmToken = await messaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
+        document.getElementById("token-display").textContent = fcmToken;
+        log("Got FCM token.");
+      } catch (err) {
+        log("Error getting token: " + err.message);
+      }
+    });
+
+    document.getElementById("btn-register").addEventListener("click", async () => {
+      if (!fcmToken) return log("Get a token first (step 1).");
+      const res = await fetch(`/api/devices/${deviceId}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: fcmToken }),
+      });
+      log(await res.json());
+    });
+
+    document.getElementById("btn-sync").addEventListener("click", async () => {
+      const label = document.getElementById("task-label").value || "Test reminder";
+      const minutes = Number(document.getElementById("task-minutes").value) || 0;
+      const fireAt = new Date(Date.now() + minutes * 60000);
+      const pad = (n) => String(n).padStart(2, "0");
+      const date = `${fireAt.getFullYear()}-${pad(fireAt.getMonth() + 1)}-${pad(fireAt.getDate())}`;
+      const time = `${pad(fireAt.getHours())}:${pad(fireAt.getMinutes())}`;
+
+      const task = { id: crypto.randomUUID(), type: "event", label, date, time };
+      const res = await fetch(`/api/devices/${deviceId}/tasks`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tasks: [task] }),
+      });
+      log(`Synced task, fires at ${date} ${time}:`);
+      log(await res.json());
+    });
+
+    document.getElementById("btn-check").addEventListener("click", async () => {
+      const res = await fetch(`/api/devices/${deviceId}/test`, { method: "POST" });
+      log(await res.json());
+      log("If the task's time has passed, a push should arrive shortly.");
+    });
+  </script>
+</body>
+</html>
