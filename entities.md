@@ -56,9 +56,8 @@ add one from the UI.
   with a ring/progress indicator taking the place of the plain checkbox.
 - A task with zero subtasks behaves exactly like today — a plain checkbox.
 - Daily recurrence's auto-generated time slots (see below) are subtasks
-  too, tagged `isSlot: true`; any extra steps you add on a daily task sit
-  alongside the time slots in the same checklist, but only the time slots
-  get regenerated each day — extra steps stay as you left them.
+  too, tagged `isSlot: true` — but daily is the one type where you can't
+  add your own extra subtasks on top; its checklist is just the time slots.
 - Subtasks can be added or removed later too, via editing the task (see
   Editing below) — not just fixed at creation.
 

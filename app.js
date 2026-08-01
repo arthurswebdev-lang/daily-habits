@@ -820,14 +820,12 @@ function renderStepDaily() {
     start: editing?.recurrence.start || "09:00",
     intervalHours: editing?.recurrence.intervalHours || 2,
     end: editing?.recurrence.end || "20:00",
-    extraSubtasks: (editing?.subtasks || []).filter((s) => !s.isSlot).map((s) => s.label),
   };
   const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add task", () => {
     const id = editing ? editing.id : crypto.randomUUID();
     const recurrence = { kind: "daily", start: data.start, intervalHours: data.intervalHours, end: data.end, lastGeneratedDate: todayDateString() };
-    const slotSubtasks = makeDailySubtasks(id, recurrence, editing?.subtasks);
-    const extraSubtasks = subtasksFromLabels(data.extraSubtasks, `${id}-extra`, editing?.subtasks);
-    commitTask(id, { type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence, subtasks: [...slotSubtasks, ...extraSubtasks] });
+    const subtasks = makeDailySubtasks(id, recurrence, editing?.subtasks);
+    commitTask(id, { type: "repetitive", label: data.label.trim(), category: data.category || NONE_KEY, recurrence, subtasks });
   });
   const updateReady = () => { submitBtn.disabled = !(data.label.trim() && data.start && data.end && data.intervalHours > 0); };
 
@@ -862,8 +860,6 @@ function renderStepDaily() {
     intervalInput,
     renderFieldLabel("Until"),
     endInput,
-    renderFieldLabel("Extra steps (optional)"),
-    renderSubtaskBuilder(data.extraSubtasks),
     submitBtn
   );
   updateReady();
