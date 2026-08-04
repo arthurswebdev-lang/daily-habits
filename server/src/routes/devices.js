@@ -94,7 +94,8 @@ router.delete("/:deviceId", async (req, res, next) => {
       return res.status(400).json({ error: "Invalid deviceId" });
     }
 
-    const devicePath = path.join(__dirname, "..", "data", "devices", `${deviceId}.json`);
+    // Fix path: __dirname is routes/, so go up 2 levels to app root
+    const devicePath = path.join(__dirname, "..", "..", "data", "devices", `${deviceId}.json`);
     console.log(`[admin] attempting to delete: ${devicePath}`);
 
     try {
