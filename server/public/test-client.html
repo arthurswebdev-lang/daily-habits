@@ -81,6 +81,13 @@
 
     firebase.initializeApp(window.FIREBASE_CONFIG || {});
     const messaging = firebase.messaging();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(err => {
+        log('Service Worker registration failed: ' + err.message);
+      });
+    }
+
     messaging.onMessage((payload) => {
       log("Foreground push received:");
       log(payload);
@@ -120,8 +127,8 @@
       const minutes = Number(document.getElementById("task-minutes").value) || 0;
       const fireAt = new Date(Date.now() + minutes * 60000);
       const pad = (n) => String(n).padStart(2, "0");
-      const date = `${fireAt.getFullYear()}-${pad(fireAt.getMonth() + 1)}-${pad(fireAt.getDate())}`;
-      const time = `${pad(fireAt.getHours())}:${pad(fireAt.getMinutes())}`;
+      const date = `${fireAt.getUTCFullYear()}-${pad(fireAt.getUTCMonth() + 1)}-${pad(fireAt.getUTCDate())}`;
+      const time = `${pad(fireAt.getUTCHours())}:${pad(fireAt.getUTCMinutes())}`;
 
       const task = { id: crypto.randomUUID(), type: "event", label, date, time };
       const res = await fetch(`/api/devices/${deviceId}/tasks`, {

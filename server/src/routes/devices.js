@@ -4,8 +4,8 @@ const { checkDevice, computeDue, resetIfNewDay, todayDateString } = require("../
 
 const router = express.Router();
 
-router.use((req, res, next) => {
-  if (!isValidDeviceId(req.params.deviceId)) {
+router.param("deviceId", (req, res, next, deviceId) => {
+  if (!isValidDeviceId(deviceId)) {
     return res.status(400).json({ error: "Invalid deviceId" });
   }
   next();

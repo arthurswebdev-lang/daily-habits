@@ -80,6 +80,7 @@ async function checkDevice(deviceId, now = new Date()) {
     try {
       await sendPush(device.token, item);
       device.notifiedKeys.push(item.key);
+      console.log(`[scheduler] push sent for device ${deviceId}: ${item.title}`);
     } catch (err) {
       // Don't mark as notified if the push actually failed — try again
       // next tick. A stale/invalid token will just keep failing quietly;
@@ -93,6 +94,7 @@ async function checkDevice(deviceId, now = new Date()) {
 async function checkAllDevices() {
   const now = new Date();
   const deviceIds = await listDeviceIds();
+  console.log(`[scheduler] checking ${deviceIds.length} devices at ${now.toISOString()}`);
   for (const deviceId of deviceIds) {
     await checkDevice(deviceId, now);
   }

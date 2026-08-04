@@ -409,6 +409,7 @@ function removeTask(id) {
   tasks = tasks.filter((t) => t.id !== id);
   render();
   deleteTaskRecord(id);
+  syncTasksToBackend();
 }
 
 function clearCompleted() {
@@ -416,6 +417,7 @@ function clearCompleted() {
   tasks = tasks.filter((t) => !isDone(t));
   render();
   for (const id of removedIds) deleteTaskRecord(id);
+  syncTasksToBackend();
 }
 
 clearDoneBtn.addEventListener("click", () => {
@@ -485,6 +487,7 @@ function commitTask(id, fields) {
   }
   closeWizard();
   render();
+  syncTasksToBackend();
 }
 
 function renderCategoryPicker(selectedKey, onChange) {
@@ -890,6 +893,78 @@ modalOverlay.addEventListener("click", (event) => {
   if (event.target === modalOverlay) closeWizard();
 });
 
+// ── push notifications ──────────────────────────────────────────────────────
+
+const BACKEND_URL = "https://daily-tasks-server.fly.dev";
+let deviceId;
+let firebaseMessaging;
+
+function getDeviceId() {
+  if (!deviceId) {
+    let id = localStorage.getItem("daily-tasks-deviceId");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("daily-tasks-deviceId", id);
+    }
+    deviceId = id;
+  }
+  return deviceId;
+}
+
+async function initFirebase() {
+  if (!window.FIREBASE_CONFIG) return;
+  firebase.initializeApp(window.FIREBASE_CONFIG);
+  firebaseMessaging = firebase.messaging();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./firebase-messaging-sw.js").catch(() => {});
+  }
+
+  firebaseMessaging.onMessage((payload) => {
+    const { title, body } = payload.notification || {};
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title || "Daily Tasks", { body, icon: "./icon.png" });
+    }
+  });
+}
+
+async function registerDeviceAndSync() {
+  if (!firebaseMessaging) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+
+    const token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
+    if (!token) return;
+
+    const deviceId = getDeviceId();
+    await fetch(`${BACKEND_URL}/api/devices/${deviceId}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+
+    syncTasksToBackend();
+  } catch (err) {
+    console.error("Firebase setup error:", err);
+  }
+}
+
+async function syncTasksToBackend() {
+  if (!firebaseMessaging) return;
+  try {
+    const deviceId = getDeviceId();
+    const syncTasks = tasks.filter(t => t.type === "event" || (t.type === "repetitive" && t.recurrence?.kind === "daily"));
+    await fetch(`${BACKEND_URL}/api/devices/${deviceId}/tasks`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tasks: syncTasks }),
+    });
+  } catch (err) {
+    console.error("Sync error:", err);
+  }
+}
+
 (async function init() {
   db = await openDB();
   tasks = await getAllTasks();
@@ -898,6 +973,9 @@ modalOverlay.addEventListener("click", (event) => {
   setInterval(() => {
     if (refreshDailyRecurrences()) render();
   }, 20000);
+
+  await initFirebase();
+  await registerDeviceAndSync();
 })();
 
 if ("serviceWorker" in navigator) {

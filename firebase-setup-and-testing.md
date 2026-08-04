@@ -104,23 +104,77 @@ If nothing arrives:
 - Make sure `server/service-account.json` is the file for the **same**
   Firebase project as `firebase-config.js`.
 
-## Part 8 — Testing on your actual iPhone
+## Part 8 — Deploy to Fly.io
 
-1. Deploy the `server/` folder somewhere with a public HTTPS URL (see the
-   "Deployment note" in `push-notifications-plan.md` — this can't run on
-   `localhost` and be reached by your phone unless they're on the exact
-   same network and you use your Mac's local IP, which is fine for a quick
-   test too: find it via `ipconfig getifaddr en0`, then visit
-   `http://<that-ip>:3000/test-client.html` from your phone — note this
-   is HTTP, not HTTPS, so push will **not** work this way; it's only
-   useful for confirming the page loads. Real push testing on iOS needs a
-   real HTTPS deployment.)
-2. Once deployed with HTTPS, add the *deployed* `test-client.html` URL to
-   your iPhone's Home Screen (Share → Add to Home Screen).
-3. Open it **from the Home Screen icon**, not Safari — this is the part
-   that's easy to get wrong and silently fail.
-4. Repeat steps 2–6 from Part 7 on the phone.
-5. Lock your phone or switch to another app before the scheduled time —
+Fly.io provides a free `.fly.dev` subdomain, automatic HTTPS, and a persistent
+VM that keeps the cron job reliable (no scale-to-zero).
+
+1. Install `flyctl`:
+   ```bash
+   curl -L https://fly.io/install.sh | sh
+   ```
+
+2. Create a `fly.toml` in your repo root:
+   ```bash
+   cd /Users/artursargsyan/workspace/artur/projects/daily-tasks
+   flyctl launch --no-deploy --name daily-tasks-server
+   ```
+   This generates a basic `fly.toml`.
+
+3. Edit `fly.toml` to disable scale-to-zero (keeps the cron job running):
+   - Find `auto_stop_machines = true` and change it to `auto_stop_machines = false`
+   - Save.
+
+4. Set the environment variables as secrets:
+   ```bash
+   flyctl secrets set ALLOWED_ORIGIN="https://arthurswebdev-lang.github.io"
+   flyctl secrets set PORT=3000
+   flyctl secrets set FIREBASE_SERVICE_ACCOUNT_PATH="./service-account.json"
+   ```
+
+5. Copy the service-account key to the repo root temporarily (so it gets
+   deployed):
+   ```bash
+   cp server/service-account.json ./service-account.json
+   ```
+   Add an entry to `.gitignore` to prevent accidental commits:
+   ```
+   /service-account.json
+   ```
+
+6. Deploy:
+   ```bash
+   flyctl deploy
+   ```
+
+7. Once deployed, Fly shows you the URL (e.g. `https://daily-tasks-server.fly.dev`).
+   Test it:
+   ```bash
+   curl https://daily-tasks-server.fly.dev/api/health
+   ```
+   Should return `{"ok":true}`.
+
+8. Update `test-client.html` to point to your deployed server:
+   - In a browser, open `https://daily-tasks-server.fly.dev/test-client.html`
+     (replace with your actual URL)
+   - Repeat steps 1–6 from Part 7 to confirm the backend works on the deployed
+     server (this confirms everything is working with real HTTPS before testing
+     on iPhone)
+
+## Part 9 — Testing on your actual iPhone
+
+1. Now that the server is deployed with HTTPS, add the deployed
+   `test-client.html` URL to your iPhone's Home Screen:
+   - Open `https://daily-tasks-server.fly.dev/test-client.html` in Safari
+   - Tap **Share** → **Add to Home Screen**
+   - Name it (e.g. "Daily Tasks Test")
+
+2. **Important**: Open it **from the Home Screen icon**, not Safari — this is
+   required for push to work on iOS. Regular Safari tabs don't support Web Push.
+
+3. Repeat steps 1–6 from Part 7 on your iPhone.
+
+4. Lock your phone or switch to another app before the scheduled time —
    that's the real test of "does this work when closed."
 
 ## Known limitations (by design, for this minimal setup)
