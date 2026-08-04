@@ -86,20 +86,33 @@ router.delete("/:deviceId", async (req, res, next) => {
   try {
     const fs = require("fs/promises");
     const path = require("path");
-    // Validate deviceId first (this throws if invalid)
-    const devicePath = path.join(__dirname, "..", "data", "devices", `${req.params.deviceId}.json`);
+    const deviceId = req.params.deviceId;
+
     // Manually validate to use proper error handling
-    if (!/^[a-zA-Z0-9-]{8,64}$/.test(req.params.deviceId)) {
+    if (!/^[a-zA-Z0-9-]{8,64}$/.test(deviceId)) {
+      console.error(`[admin] invalid deviceId: ${deviceId}`);
       return res.status(400).json({ error: "Invalid deviceId" });
     }
+
+    const devicePath = path.join(__dirname, "..", "data", "devices", `${deviceId}.json`);
+    console.log(`[admin] attempting to delete: ${devicePath}`);
+
     try {
+      const stats = await fs.stat(devicePath);
+      console.log(`[admin] file exists, size: ${stats.size} bytes`);
       await fs.unlink(devicePath);
-      console.log(`[admin] deleted device ${req.params.deviceId}`);
+      console.log(`[admin] ✅ deleted device ${deviceId}`);
     } catch (err) {
-      if (err.code !== "ENOENT") throw err;
+      if (err.code === "ENOENT") {
+        console.log(`[admin] file not found: ${devicePath}`);
+      } else {
+        console.error(`[admin] error deleting ${devicePath}:`, err.message);
+        throw err;
+      }
     }
     res.json({ ok: true });
   } catch (err) {
+    console.error(`[admin] delete error:`, err);
     next(err);
   }
 });
