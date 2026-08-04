@@ -916,10 +916,6 @@ async function initFirebase() {
   firebase.initializeApp(window.FIREBASE_CONFIG);
   firebaseMessaging = firebase.messaging();
 
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./firebase-messaging-sw.js").catch(() => {});
-  }
-
   firebaseMessaging.onMessage((payload) => {
     const { title, body } = payload.notification || {};
     if ("Notification" in window && Notification.permission === "granted") {
