@@ -985,7 +985,7 @@ async function registerDeviceAndSync() {
   const btn = document.getElementById("enable-notifications-btn");
   if (Notification.permission === "granted") {
     await requestNotificationPermission();
-  } else if (Notification.permission === "default") {
+  } else {
     btn.style.display = "block";
   }
 }
