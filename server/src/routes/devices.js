@@ -84,17 +84,22 @@ router.get("/:deviceId", async (req, res, next) => {
 // DELETE /api/devices/:deviceId — delete a device
 router.delete("/:deviceId", async (req, res, next) => {
   try {
-    const { isValidDeviceId } = require("../store");
-    if (!isValidDeviceId(req.params.deviceId)) {
+    const fs = require("fs/promises");
+    const path = require("path");
+    // Validate deviceId first (this throws if invalid)
+    const devicePath = path.join(__dirname, "..", "data", "devices", `${req.params.deviceId}.json`);
+    // Manually validate to use proper error handling
+    if (!/^[a-zA-Z0-9-]{8,64}$/.test(req.params.deviceId)) {
       return res.status(400).json({ error: "Invalid deviceId" });
     }
-    const path = require("path");
-    const fs = require("fs/promises");
-    const filePath = path.join(__dirname, "..", "data", "devices", `${req.params.deviceId}.json`);
-    await fs.unlink(filePath);
+    try {
+      await fs.unlink(devicePath);
+      console.log(`[admin] deleted device ${req.params.deviceId}`);
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+    }
     res.json({ ok: true });
   } catch (err) {
-    if (err.code === "ENOENT") return res.json({ ok: true });
     next(err);
   }
 });
