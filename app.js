@@ -944,6 +944,7 @@ async function initFirebase() {
 async function requestNotificationPermission() {
   if (!firebaseMessaging) {
     console.log("[Firebase] Messaging not initialized");
+    updateFirebaseStatus("❌ Messaging not ready");
     return false;
   }
   try {
@@ -952,31 +953,51 @@ async function requestNotificationPermission() {
     console.log("[Firebase] Permission result:", permission);
     if (permission !== "granted") {
       console.log("[Firebase] Permission denied or dismissed");
+      updateFirebaseStatus("❌ Permission denied");
       return false;
     }
 
-    console.log("[Firebase] Getting FCM token...");
-    const token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
+    console.log("[Firebase] Permission granted, getting FCM token...");
+    updateFirebaseStatus("⏳ Getting token...");
+
+    let token;
+    try {
+      token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
+    } catch (tokenErr) {
+      console.error("[Firebase] Token error:", tokenErr.message);
+      updateFirebaseStatus("❌ Token error: " + tokenErr.message.substring(0, 30));
+      return false;
+    }
+
     if (!token) {
-      console.error("[Firebase] No token received");
+      console.error("[Firebase] No token received (empty)");
+      updateFirebaseStatus("❌ No token received");
       return false;
     }
     console.log("[Firebase] Got token:", token.substring(0, 20) + "...");
 
     const deviceId = getDeviceId();
     console.log("[Firebase] Registering device:", deviceId);
-    await fetch(`${BACKEND_URL}/api/devices/${deviceId}/register`, {
+    const regRes = await fetch(`${BACKEND_URL}/api/devices/${deviceId}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     });
-    console.log("[Firebase] Device registered");
+    console.log("[Firebase] Register response:", regRes.status);
 
+    if (!regRes.ok) {
+      console.error("[Firebase] Registration failed");
+      return false;
+    }
+
+    console.log("[Firebase] Device registered");
+    updateFirebaseStatus("✅ Notifications enabled");
     syncTasksToBackend();
     document.getElementById("enable-notifications-btn").style.display = "none";
     return true;
   } catch (err) {
     console.error("[Firebase] Setup error:", err);
+    updateFirebaseStatus("❌ Error: " + err.message.substring(0, 30));
     return false;
   }
 }
