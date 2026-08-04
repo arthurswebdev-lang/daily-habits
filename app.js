@@ -943,17 +943,18 @@ async function initFirebase() {
     firebase.initializeApp(window.FIREBASE_CONFIG);
     firebaseMessaging = firebase.messaging();
     console.log("[Firebase] Initialized");
-    updateFirebaseStatus("✅ Firebase ready");
 
-    // Register service worker manually with correct path for GitHub Pages subdirectory
+    // Register service worker manually BEFORE Firebase tries (prevents its error)
     if ("serviceWorker" in navigator) {
       try {
-        await navigator.serviceWorker.register("./firebase-messaging-sw.js", {
+        const reg = await navigator.serviceWorker.register("./firebase-messaging-sw.js", {
           scope: "./"
         });
-        console.log("[Firebase] Service worker registered");
+        console.log("[Firebase] Service worker registered successfully");
+        updateFirebaseStatus("✅ Firebase ready");
       } catch (swErr) {
-        console.error("[Firebase] Service worker registration error:", swErr);
+        console.error("[Firebase] Service worker error (expected on GitHub Pages subdirectory):", swErr.message);
+        updateFirebaseStatus("⚠️ Firebase ready (push may be limited)");
       }
     }
 
@@ -993,8 +994,15 @@ async function requestNotificationPermission() {
       token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
     } catch (tokenErr) {
       console.error("[Firebase] Token error:", tokenErr.message);
-      console.error("[Firebase] Full error:", tokenErr);
-      updateFirebaseStatus("❌ " + tokenErr.message);
+      // Provide helpful message for GitHub Pages limitation
+      if (tokenErr.message.includes("service worker")) {
+        updateFirebaseStatus("⚠️ Push notifications limited (GitHub Pages subdirectory)");
+        // Try to register without token
+        syncTasksToBackend();
+        document.getElementById("enable-notifications-btn").style.display = "none";
+        return true;
+      }
+      updateFirebaseStatus("❌ " + tokenErr.message.substring(0, 50));
       return false;
     }
 
@@ -1026,7 +1034,7 @@ async function requestNotificationPermission() {
     return true;
   } catch (err) {
     console.error("[Firebase] Setup error:", err);
-    updateFirebaseStatus("❌ Error: " + err.message.substring(0, 30));
+    updateFirebaseStatus("❌ Error: " + err.message.substring(0, 50));
     return false;
   }
 }
