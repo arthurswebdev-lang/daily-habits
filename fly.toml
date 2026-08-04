@@ -1,0 +1,27 @@
+# fly.toml app configuration file generated for daily-tasks-server on 2026-08-04T18:54:27+04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'daily-tasks-server'
+primary_region = 'fra'
+
+[build]
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  max_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  memory = '256mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256
+
+[[mounts]]
+  source = 'app_data'
+  destination = '/app/data'
