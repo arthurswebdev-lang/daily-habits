@@ -104,14 +104,23 @@ async function deleteDevice(deviceId) {
   if (!confirm(`Delete device ${deviceId}?\n\nAll tasks and data will be permanently removed.`)) return;
 
   try {
-    const res = await fetch(`${SERVER_URL}/api/devices/${deviceId}`, { method: "DELETE" });
+    console.log("Deleting device:", deviceId);
+    const res = await fetch(`${SERVER_URL}/api/devices/${deviceId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" }
+    });
+    console.log("Delete response:", res.status, res.statusText);
+    const data = await res.json();
+    console.log("Delete response data:", data);
+
     if (res.ok) {
       showStatus("Device deleted successfully");
-      await loadDevices();
+      setTimeout(() => loadDevices(), 500);
     } else {
-      alert("Error deleting device");
+      alert("Error deleting device: " + (data.error || res.statusText));
     }
   } catch (err) {
+    console.error("Delete error:", err);
     alert("Error: " + err.message);
   }
 }
