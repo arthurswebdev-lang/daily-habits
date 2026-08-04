@@ -6,6 +6,7 @@ const cors = require("cors");
 
 const devicesRouter = require("./routes/devices");
 const { startScheduler } = require("./scheduler");
+const { listDeviceIds, readDevice } = require("./store");
 
 const app = express();
 app.use(express.json());
@@ -15,6 +16,28 @@ app.use(cors(allowedOrigin ? { origin: allowedOrigin.split(",").map((s) => s.tri
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 app.use("/api/devices", devicesRouter);
+
+// Admin API: list all devices
+app.get("/api/admin/devices", async (req, res, next) => {
+  try {
+    const deviceIds = await listDeviceIds();
+    const devices = [];
+    for (const id of deviceIds) {
+      const device = await readDevice(id);
+      if (device) {
+        devices.push({
+          deviceId: device.deviceId,
+          taskCount: (device.tasks || []).length,
+          hasToken: !!device.token,
+          updatedAt: device.updatedAt,
+        });
+      }
+    }
+    res.json(devices);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Minimal static test page (server/public/test-client.html) — lets you
 // exercise the whole loop (get an FCM token, register, sync a task, force

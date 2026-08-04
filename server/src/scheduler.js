@@ -67,25 +67,31 @@ function resetIfNewDay(device, now) {
 
 async function checkDevice(deviceId, now = new Date()) {
   const device = await readDevice(deviceId);
-  if (!device || !device.token) return;
+  if (!device || !device.token) {
+    if (!device) console.log(`[scheduler] device ${deviceId} not found`);
+    if (device && !device.token) console.log(`[scheduler] device ${deviceId} has no token`);
+    return;
+  }
 
   resetIfNewDay(device, now);
   const due = computeDue(device, now);
+
   if (due.length === 0) {
     await writeDevice(deviceId, device);
     return;
   }
 
+  console.log(`[scheduler] device ${deviceId} has ${due.length} due tasks`);
   for (const item of due) {
     try {
       await sendPush(device.token, item);
       device.notifiedKeys.push(item.key);
-      console.log(`[scheduler] push sent for device ${deviceId}: ${item.title}`);
+      console.log(`[scheduler] ✅ push sent for device ${deviceId}: ${item.title}`);
     } catch (err) {
       // Don't mark as notified if the push actually failed — try again
       // next tick. A stale/invalid token will just keep failing quietly;
       // fine for a personal single-user server.
-      console.error(`[scheduler] push failed for device ${deviceId}:`, err.message);
+      console.error(`[scheduler] ❌ push failed for device ${deviceId}:`, err.message);
     }
   }
   await writeDevice(deviceId, device);

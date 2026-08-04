@@ -68,4 +68,35 @@ router.post("/:deviceId/test", async (req, res, next) => {
   }
 });
 
+// GET /api/devices/:deviceId — retrieve device data
+router.get("/:deviceId", async (req, res, next) => {
+  try {
+    const device = await readDevice(req.params.deviceId);
+    if (!device) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+    res.json(device);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/devices/:deviceId — delete a device
+router.delete("/:deviceId", async (req, res, next) => {
+  try {
+    const { isValidDeviceId } = require("../store");
+    if (!isValidDeviceId(req.params.deviceId)) {
+      return res.status(400).json({ error: "Invalid deviceId" });
+    }
+    const path = require("path");
+    const fs = require("fs/promises");
+    const filePath = path.join(__dirname, "..", "data", "devices", `${req.params.deviceId}.json`);
+    await fs.unlink(filePath);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === "ENOENT") return res.json({ ok: true });
+    next(err);
+  }
+});
+
 module.exports = router;

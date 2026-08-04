@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Daily Tasks Server</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+  h1 { color: #333; }
+  .device-list { display: grid; gap: 12px; }
+  .device-card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+  .device-card h3 { margin: 0 0 8px 0; font-size: 14px; color: #666; }
+  .device-card p { margin: 4px 0; font-size: 13px; color: #999; }
+  .device-card code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-size: 12px; }
+  .device-actions { margin-top: 12px; display: flex; gap: 8px; }
+  button { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .btn-view { background: #0066cc; color: white; }
+  .btn-delete { background: #dc2626; color: white; }
+  .btn-view:hover { background: #0052a3; }
+  .btn-delete:hover { background: #b91c1c; }
+  .controls { margin-bottom: 20px; display: flex; gap: 8px; }
+  .btn-refresh { background: #666; color: white; padding: 8px 16px; }
+  .btn-refresh:hover { background: #555; }
+  .status { padding: 12px; background: #e8f5e9; border-radius: 4px; margin-bottom: 20px; color: #2e7d32; }
+  .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+  .modal.open { display: flex; align-items: center; justify-content: center; }
+  .modal-content { background: white; border-radius: 8px; padding: 24px; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+  .modal-close { float: right; cursor: pointer; font-size: 24px; color: #666; }
+  pre { background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Admin Panel — Daily Tasks Server</h1>
+
+<div class="controls">
+  <button class="btn-refresh" onclick="loadDevices()">Refresh</button>
+  <span id="status-msg"></span>
+</div>
+
+<div class="device-list" id="device-list">
+  <p>Loading...</p>
+</div>
+
+<div class="modal" id="device-modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeModal()">&times;</span>
+    <h2 id="modal-title"></h2>
+    <pre id="modal-body"></pre>
+  </div>
+</div>
+
+<script>
+const SERVER_URL = window.location.origin;
+
+async function loadDevices() {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/admin/devices`);
+    const devices = await res.json();
+
+    const list = document.getElementById("device-list");
+    if (devices.length === 0) {
+      list.innerHTML = "<p>No devices registered yet.</p>";
+      return;
+    }
+
+    list.innerHTML = devices.map(device => `
+      <div class="device-card">
+        <h3>Device ID</h3>
+        <code>${device.deviceId}</code>
+        <p><strong>Tasks:</strong> ${device.taskCount}</p>
+        <p><strong>Token:</strong> ${device.hasToken ? '✅ Registered' : '❌ No token'}</p>
+        <p><strong>Last updated:</strong> ${new Date(device.updatedAt).toLocaleString()}</p>
+        <div class="device-actions">
+          <button class="btn-view" onclick="viewDevice('${device.deviceId}')">View Details</button>
+          <button class="btn-delete" onclick="deleteDevice('${device.deviceId}')">Delete</button>
+        </div>
+      </div>
+    `).join("");
+  } catch (err) {
+    document.getElementById("device-list").innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+  }
+}
+
+async function viewDevice(deviceId) {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/devices/${deviceId}`);
+    const device = await res.json();
+
+    document.getElementById("modal-title").textContent = `Device: ${deviceId}`;
+    document.getElementById("modal-body").textContent = JSON.stringify(device, null, 2);
+    document.getElementById("device-modal").classList.add("open");
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
+function closeModal() {
+  document.getElementById("device-modal").classList.remove("open");
+}
+
+async function deleteDevice(deviceId) {
+  if (!confirm(`Delete device ${deviceId}?\n\nAll tasks and data will be permanently removed.`)) return;
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/devices/${deviceId}`, { method: "DELETE" });
+    if (res.ok) {
+      showStatus("Device deleted successfully");
+      await loadDevices();
+    } else {
+      alert("Error deleting device");
+    }
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+}
+
+function showStatus(msg) {
+  const el = document.getElementById("status-msg");
+  el.textContent = "✅ " + msg;
+  setTimeout(() => { el.textContent = ""; }, 3000);
+}
+
+// Load on page load
+loadDevices();
+</script>
+
+</body>
+</html>

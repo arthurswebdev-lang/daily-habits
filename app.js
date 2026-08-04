@@ -996,14 +996,32 @@ async function syncTasksToBackend() {
   if (!firebaseMessaging) return;
   try {
     const deviceId = getDeviceId();
-    const syncTasks = tasks.filter(t => t.type === "event" || (t.type === "repetitive" && t.recurrence?.kind === "daily"));
+    // Sync all tasks, not just event/daily (backend will schedule the ones with times)
     await fetch(`${BACKEND_URL}/api/devices/${deviceId}/tasks`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tasks: syncTasks }),
+      body: JSON.stringify({ tasks: tasks }),
     });
+    console.log("[Firebase] Tasks synced to backend");
   } catch (err) {
-    console.error("Sync error:", err);
+    console.error("[Firebase] Sync error:", err);
+  }
+}
+
+async function fetchTasksFromBackend() {
+  if (!firebaseMessaging) return;
+  try {
+    const deviceId = getDeviceId();
+    const res = await fetch(`${BACKEND_URL}/api/devices/${deviceId}`);
+    if (!res.ok) return;
+    const device = await res.json();
+    if (device.tasks && Array.isArray(device.tasks)) {
+      tasks = device.tasks;
+      for (const task of tasks) await putTask(task);
+      console.log("[Firebase] Tasks fetched from backend:", tasks.length);
+    }
+  } catch (err) {
+    console.error("[Firebase] Fetch tasks error:", err);
   }
 }
 
@@ -1018,6 +1036,8 @@ async function syncTasksToBackend() {
 
   await initFirebase();
   await registerDeviceAndSync();
+  await fetchTasksFromBackend();
+  render();
 })();
 
 if ("serviceWorker" in navigator) {
