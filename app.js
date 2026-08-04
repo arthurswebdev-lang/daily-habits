@@ -941,10 +941,10 @@ async function initFirebase() {
   }
 }
 
-async function registerDeviceAndSync() {
+async function requestNotificationPermission() {
   if (!firebaseMessaging) {
     console.log("[Firebase] Messaging not initialized");
-    return;
+    return false;
   }
   try {
     console.log("[Firebase] Requesting notification permission...");
@@ -952,14 +952,14 @@ async function registerDeviceAndSync() {
     console.log("[Firebase] Permission result:", permission);
     if (permission !== "granted") {
       console.log("[Firebase] Permission denied or dismissed");
-      return;
+      return false;
     }
 
     console.log("[Firebase] Getting FCM token...");
     const token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
     if (!token) {
       console.error("[Firebase] No token received");
-      return;
+      return false;
     }
     console.log("[Firebase] Got token:", token.substring(0, 20) + "...");
 
@@ -973,10 +973,24 @@ async function registerDeviceAndSync() {
     console.log("[Firebase] Device registered");
 
     syncTasksToBackend();
+    document.getElementById("enable-notifications-btn").style.display = "none";
+    return true;
   } catch (err) {
     console.error("[Firebase] Setup error:", err);
+    return false;
   }
 }
+
+async function registerDeviceAndSync() {
+  const btn = document.getElementById("enable-notifications-btn");
+  if (Notification.permission === "granted") {
+    await requestNotificationPermission();
+  } else if (Notification.permission === "default") {
+    btn.style.display = "block";
+  }
+}
+
+document.getElementById("enable-notifications-btn")?.addEventListener("click", requestNotificationPermission);
 
 async function syncTasksToBackend() {
   if (!firebaseMessaging) return;
