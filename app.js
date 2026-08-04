@@ -681,17 +681,33 @@ function renderStepOneTime() {
 function renderStepEvent() {
   const editing = wizard.editingTask;
   const today = new Date().toISOString().slice(0, 10);
+
+  // Convert UTC dates back to local for editing
+  let displayDate = today;
+  let displayTime = "09:00";
+  if (editing?.date && editing?.time) {
+    const utcDateTime = new Date(`${editing.date}T${editing.time}Z`);
+    displayDate = utcDateTime.toISOString().slice(0, 10);
+    displayTime = utcDateTime.toISOString().slice(11, 16);
+  }
+
   const data = {
     label: editing?.label || "",
     category: editing?.category ?? activeCategory,
-    date: editing?.date || today,
-    time: editing?.time || "09:00",
+    date: displayDate,
+    time: displayTime,
     subtasks: (editing?.subtasks || []).map((s) => s.label),
   };
   const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add event", () => {
     const id = editing ? editing.id : crypto.randomUUID();
     const subtasks = data.subtasks.length ? subtasksFromLabels(data.subtasks, id, editing?.subtasks) : undefined;
-    const fields = { type: "event", label: data.label.trim(), category: data.category || NONE_KEY, date: data.date, time: data.time, subtasks };
+
+    // Convert local date/time to UTC for backend storage
+    const localDateTime = new Date(`${data.date}T${data.time}`);
+    const utcDate = localDateTime.toISOString().slice(0, 10);
+    const utcTime = localDateTime.toISOString().slice(11, 16);
+
+    const fields = { type: "event", label: data.label.trim(), category: data.category || NONE_KEY, date: utcDate, time: utcTime, subtasks };
     if (!subtasks) fields.done = editing ? (editing.done ?? false) : false;
     commitTask(id, fields);
   });
