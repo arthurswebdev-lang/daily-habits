@@ -929,6 +929,18 @@ async function initFirebase() {
     console.log("[Firebase] Initialized");
     updateFirebaseStatus("✅ Firebase ready");
 
+    // Register service worker manually with correct path for GitHub Pages subdirectory
+    if ("serviceWorker" in navigator) {
+      try {
+        await navigator.serviceWorker.register("./firebase-messaging-sw.js", {
+          scope: "./"
+        });
+        console.log("[Firebase] Service worker registered");
+      } catch (swErr) {
+        console.error("[Firebase] Service worker registration error:", swErr);
+      }
+    }
+
     firebaseMessaging.onMessage((payload) => {
       const { title, body } = payload.notification || {};
       if ("Notification" in window && Notification.permission === "granted") {
