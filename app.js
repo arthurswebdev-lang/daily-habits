@@ -965,7 +965,8 @@ async function requestNotificationPermission() {
       token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
     } catch (tokenErr) {
       console.error("[Firebase] Token error:", tokenErr.message);
-      updateFirebaseStatus("❌ Token error: " + tokenErr.message.substring(0, 30));
+      console.error("[Firebase] Full error:", tokenErr);
+      updateFirebaseStatus("❌ " + tokenErr.message);
       return false;
     }
 
