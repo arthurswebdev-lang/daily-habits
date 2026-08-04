@@ -911,15 +911,23 @@ function getDeviceId() {
   return deviceId;
 }
 
+function updateFirebaseStatus(status) {
+  const el = document.getElementById("firebase-status");
+  if (el) el.textContent = status;
+}
+
 async function initFirebase() {
   if (!window.FIREBASE_CONFIG) {
     console.log("[Firebase] Config not loaded");
+    updateFirebaseStatus("❌ Config not loaded");
     return;
   }
   try {
+    updateFirebaseStatus("⏳ Initializing...");
     firebase.initializeApp(window.FIREBASE_CONFIG);
     firebaseMessaging = firebase.messaging();
     console.log("[Firebase] Initialized");
+    updateFirebaseStatus("✅ Firebase ready");
 
     firebaseMessaging.onMessage((payload) => {
       const { title, body } = payload.notification || {};
@@ -929,6 +937,7 @@ async function initFirebase() {
     });
   } catch (err) {
     console.error("[Firebase] Init error:", err);
+    updateFirebaseStatus("❌ Firebase error: " + err.message.substring(0, 30));
   }
 }
 
