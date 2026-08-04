@@ -912,37 +912,60 @@ function getDeviceId() {
 }
 
 async function initFirebase() {
-  if (!window.FIREBASE_CONFIG) return;
-  firebase.initializeApp(window.FIREBASE_CONFIG);
-  firebaseMessaging = firebase.messaging();
+  if (!window.FIREBASE_CONFIG) {
+    console.log("[Firebase] Config not loaded");
+    return;
+  }
+  try {
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    firebaseMessaging = firebase.messaging();
+    console.log("[Firebase] Initialized");
 
-  firebaseMessaging.onMessage((payload) => {
-    const { title, body } = payload.notification || {};
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title || "Daily Tasks", { body, icon: "./icon.png" });
-    }
-  });
+    firebaseMessaging.onMessage((payload) => {
+      const { title, body } = payload.notification || {};
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title || "Daily Tasks", { body, icon: "./icon.png" });
+      }
+    });
+  } catch (err) {
+    console.error("[Firebase] Init error:", err);
+  }
 }
 
 async function registerDeviceAndSync() {
-  if (!firebaseMessaging) return;
+  if (!firebaseMessaging) {
+    console.log("[Firebase] Messaging not initialized");
+    return;
+  }
   try {
+    console.log("[Firebase] Requesting notification permission...");
     const permission = await Notification.requestPermission();
-    if (permission !== "granted") return;
+    console.log("[Firebase] Permission result:", permission);
+    if (permission !== "granted") {
+      console.log("[Firebase] Permission denied or dismissed");
+      return;
+    }
 
+    console.log("[Firebase] Getting FCM token...");
     const token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
-    if (!token) return;
+    if (!token) {
+      console.error("[Firebase] No token received");
+      return;
+    }
+    console.log("[Firebase] Got token:", token.substring(0, 20) + "...");
 
     const deviceId = getDeviceId();
+    console.log("[Firebase] Registering device:", deviceId);
     await fetch(`${BACKEND_URL}/api/devices/${deviceId}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     });
+    console.log("[Firebase] Device registered");
 
     syncTasksToBackend();
   } catch (err) {
-    console.error("Firebase setup error:", err);
+    console.error("[Firebase] Setup error:", err);
   }
 }
 
