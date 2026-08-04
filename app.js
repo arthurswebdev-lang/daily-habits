@@ -961,9 +961,39 @@ async function initFirebase() {
     firebaseMessaging.onMessage((payload) => {
       const { title, body } = payload.notification || {};
       if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title || "Daily Tasks", { body, icon: "./icon.png" });
+        new Notification(title || "Daily Tasks", {
+          body,
+          icon: "./icon.png",
+          badge: "./icon.png",
+          tag: "task-notification",
+          requireInteraction: true
+        });
       }
+      // Play alert sound
+      playAlertSound();
     });
+
+    function playAlertSound() {
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 800; // Hz
+        oscillator.type = "sine";
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+      } catch (err) {
+        console.log("[Audio] Could not play alert sound:", err.message);
+      }
+    }
   } catch (err) {
     console.error("[Firebase] Init error:", err);
     updateFirebaseStatus("❌ Firebase error: " + err.message.substring(0, 30));

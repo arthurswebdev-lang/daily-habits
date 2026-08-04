@@ -9,5 +9,13 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification || {};
-  self.registration.showNotification(title || "Daily Tasks", { body });
+  self.registration.showNotification(title || "Daily Tasks", {
+    body,
+    badge: "/icon.png",
+    icon: "/icon.png",
+    tag: "task-notification",
+    requireInteraction: true, // Keep notification until user interacts
+    // Note: sound URL needs to be accessible and HTTPS
+    // sound: "/notification-sound.mp3" // Uncomment if you add a sound file
+  });
 });
