@@ -170,7 +170,7 @@ function refreshDailyRecurrences() {
 }
 
 function formatEventMeta(task) {
-  const dt = new Date(`${task.date}T${task.time}`);
+  const dt = new Date(`${task.date}T${task.time}Z`);
   const date = dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const time = dt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return `${date} · ${time}`;
@@ -687,8 +687,9 @@ function renderStepEvent() {
   let displayTime = "09:00";
   if (editing?.date && editing?.time) {
     const utcDateTime = new Date(`${editing.date}T${editing.time}Z`);
-    displayDate = utcDateTime.toISOString().slice(0, 10);
-    displayTime = utcDateTime.toISOString().slice(11, 16);
+    displayDate = utcDateTime.toLocaleDateString('sv-SE');
+    const timeStr = utcDateTime.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', hour12: false });
+    displayTime = timeStr.slice(0, 5);
   }
 
   const data = {

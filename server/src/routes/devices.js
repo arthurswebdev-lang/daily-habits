@@ -88,12 +88,7 @@ router.delete("/:deviceId", async (req, res, next) => {
     const path = require("path");
     const deviceId = req.params.deviceId;
 
-    // Manually validate to use proper error handling
-    if (!/^[a-zA-Z0-9-]{8,64}$/.test(deviceId)) {
-      console.error(`[admin] invalid deviceId: ${deviceId}`);
-      return res.status(400).json({ error: "Invalid deviceId" });
-    }
-
+    // deviceId already validated by router.param() middleware above
     // Fix path: __dirname is routes/, so go up 2 levels to app root
     const devicePath = path.join(__dirname, "..", "..", "data", "devices", `${deviceId}.json`);
     console.log(`[admin] attempting to delete: ${devicePath}`);

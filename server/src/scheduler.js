@@ -26,7 +26,7 @@ function generateDailySlots({ start, intervalHours, end }) {
 // that is due right now and not already in notifiedKeys. Only "event" and
 // "repetitive/daily" tasks carry an exact time — see push-notifications-plan.md.
 function computeDue(device, now) {
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const notified = new Set(device.notifiedKeys || []);
   const due = [];
 
@@ -34,7 +34,7 @@ function computeDue(device, now) {
     if (task.type === "event") {
       const key = `event:${task.id}`;
       if (notified.has(key)) continue;
-      const dt = new Date(`${task.date}T${task.time}`);
+      const dt = new Date(`${task.date}T${task.time}Z`);
       if (dt <= now) due.push({ key, title: task.label, body: "Event is due now" });
     } else if (task.type === "repetitive" && task.recurrence?.kind === "daily") {
       for (const slot of generateDailySlots(task.recurrence)) {
@@ -67,9 +67,12 @@ function resetIfNewDay(device, now) {
 
 async function checkDevice(deviceId, now = new Date()) {
   const device = await readDevice(deviceId);
-  if (!device || !device.token) {
-    if (!device) console.log(`[scheduler] device ${deviceId} not found`);
-    if (device && !device.token) console.log(`[scheduler] device ${deviceId} has no token`);
+  if (!device) {
+    console.log(`[scheduler] device ${deviceId} not found`);
+    return;
+  }
+  if (!device.token) {
+    console.log(`[scheduler] device ${deviceId} has no token`);
     return;
   }
 

@@ -13,7 +13,9 @@ function isValidDeviceId(deviceId) {
 
 function deviceFilePath(deviceId) {
   if (!isValidDeviceId(deviceId)) {
-    throw new Object.assign(new Error("Invalid deviceId"), { statusCode: 400 });
+    const err = new Error("Invalid deviceId");
+    err.statusCode = 400;
+    throw err;
   }
   return path.join(DEVICES_DIR, `${deviceId}.json`);
 }

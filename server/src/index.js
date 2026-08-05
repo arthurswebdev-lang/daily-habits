@@ -6,7 +6,6 @@ const cors = require("cors");
 
 const devicesRouter = require("./routes/devices");
 const { startScheduler } = require("./scheduler");
-const { listDeviceIds, readDevice } = require("./store");
 
 const app = express();
 app.use(express.json());
@@ -46,7 +45,8 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.statusCode || 500).json({ error: err.message || "Internal error" });
+  const statusCode = (err.statusCode && err.statusCode >= 400 && err.statusCode < 600) ? err.statusCode : 500;
+  res.status(statusCode).json({ error: err.message || "Internal error" });
 });
 
 const port = process.env.PORT || 3000;
