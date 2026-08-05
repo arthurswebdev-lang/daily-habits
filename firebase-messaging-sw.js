@@ -23,15 +23,24 @@ messaging.onBackgroundMessage((payload) => {
     return;
   }
 
-  lastNotificationTime = now;
-  lastNotificationBody = body;
+  // Additional check: see if a notification with this body is already visible
+  self.registration.getNotifications().then((notifications) => {
+    const isDuplicate = notifications.some((n) => n.body === body);
+    if (isDuplicate) {
+      console.log("[SW] Notification already visible, skipping:", body);
+      return;
+    }
 
-  console.log("[SW] Showing notification:", body);
-  self.registration.showNotification(title || "Daily Tasks", {
-    body,
-    badge: "/icon.png",
-    icon: "/icon.png",
-    tag: "task-notification",
-    requireInteraction: true,
+    lastNotificationTime = now;
+    lastNotificationBody = body;
+
+    console.log("[SW] Showing notification:", body);
+    self.registration.showNotification(title || "Daily Tasks", {
+      body,
+      badge: "/icon.png",
+      icon: "/icon.png",
+      tag: "task-notification",
+      requireInteraction: true,
+    });
   });
 });
