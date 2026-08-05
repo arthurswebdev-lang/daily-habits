@@ -9,5 +9,11 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification || {};
-  self.registration.showNotification(title || "Daily Tasks", { body });
+  self.registration.showNotification(title || "Daily Tasks", {
+    body,
+    badge: "/icon.png",
+    icon: "/icon.png",
+    tag: "task-notification",
+    requireInteraction: true,
+  });
 });

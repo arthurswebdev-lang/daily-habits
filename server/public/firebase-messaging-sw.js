@@ -14,8 +14,6 @@ messaging.onBackgroundMessage((payload) => {
     badge: "/icon.png",
     icon: "/icon.png",
     tag: "task-notification",
-    requireInteraction: true, // Keep notification until user interacts
-    // Note: sound URL needs to be accessible and HTTPS
-    // sound: "/notification-sound.mp3" // Uncomment if you add a sound file
+    requireInteraction: true,
   });
 });

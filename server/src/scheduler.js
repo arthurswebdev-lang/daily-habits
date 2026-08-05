@@ -103,7 +103,7 @@ async function checkDevice(deviceId, now = new Date()) {
 async function checkAllDevices() {
   const now = new Date();
   const deviceIds = await listDeviceIds();
-  console.log(`[scheduler] checking ${deviceIds.length} devices at ${now.toISOString()}`);
+  console.log(`[scheduler] ⏱️ tick at ${now.toISOString()} — checking ${deviceIds.length} devices: ${deviceIds.join(", ")}`);
   for (const deviceId of deviceIds) {
     await checkDevice(deviceId, now);
   }
