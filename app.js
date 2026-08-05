@@ -492,32 +492,21 @@ function commitTask(id, fields) {
   syncTasksToBackend();
 }
 
-function renderCategoryPicker(selectedKey, onChange) {
-  const grid = document.createElement("div");
-  grid.className = "category-picker";
+function renderCategorySelect(selectedKey, onChange) {
+  const select = document.createElement("select");
+  select.className = "wizard-input";
+
   for (const key of [...CATEGORY_ORDER, NONE_KEY]) {
     const cat = categoryOf(key);
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "category-picker-btn" + (key === selectedKey ? " selected" : "");
-    btn.style.setProperty("--cat-color", cat.color);
-
-    const iconSpan = document.createElement("span");
-    iconSpan.className = "cp-icon";
-    iconSpan.textContent = cat.icon;
-    const labelSpan = document.createElement("span");
-    labelSpan.className = "cp-label";
-    labelSpan.textContent = cat.label;
-    btn.append(iconSpan, labelSpan);
-
-    btn.addEventListener("click", () => {
-      grid.querySelectorAll(".category-picker-btn").forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      onChange(key);
-    });
-    grid.appendChild(btn);
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = `${cat.icon} ${cat.label}`;
+    if (key === selectedKey) option.selected = true;
+    select.appendChild(option);
   }
-  return grid;
+
+  select.addEventListener("change", () => onChange(select.value));
+  return select;
 }
 
 function renderLabelInput(placeholder, onInput, value) {
@@ -656,7 +645,7 @@ function renderStepOneTime() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? activeCategory,
+    category: editing?.category ?? NONE_KEY,
     subtasks: (editing?.subtasks || []).map((s) => s.label),
   };
   const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add task", () => {
@@ -669,10 +658,10 @@ function renderStepOneTime() {
   const updateReady = () => { submitBtn.disabled = !data.label.trim(); };
 
   wizardContent.append(
+    renderFieldLabel("Category"),
+    renderCategorySelect(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Call the plumber", (v) => { data.label = v; updateReady(); }, data.label),
-    renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Subtasks (optional)"),
     renderSubtaskBuilder(data.subtasks),
     submitBtn
@@ -696,7 +685,7 @@ function renderStepEvent() {
 
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? activeCategory,
+    category: editing?.category ?? NONE_KEY,
     date: displayDate,
     time: displayTime,
     subtasks: (editing?.subtasks || []).map((s) => s.label),
@@ -729,10 +718,10 @@ function renderStepEvent() {
   timeInput.addEventListener("input", () => { data.time = timeInput.value; updateReady(); });
 
   wizardContent.append(
+    renderFieldLabel("Category"),
+    renderCategorySelect(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Event name"),
     renderLabelInput("e.g. Doctor's appointment", (v) => { data.label = v; updateReady(); }, data.label),
-    renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Date"),
     dateInput,
     renderFieldLabel("Time"),
@@ -748,7 +737,7 @@ function renderStepWeekly() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? activeCategory,
+    category: editing?.category ?? NONE_KEY,
     days: editing ? [...editing.recurrence.days] : [],
     subtasks: (editing?.subtasks || []).map((s) => s.label),
   };
@@ -782,10 +771,10 @@ function renderStepWeekly() {
   }
 
   wizardContent.append(
+    renderFieldLabel("Category"),
+    renderCategorySelect(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Gym session", (v) => { data.label = v; updateReady(); }, data.label),
-    renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Repeat on"),
     dayRow,
     renderFieldLabel("Subtasks (optional)"),
@@ -799,7 +788,7 @@ function renderStepMonthly() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? activeCategory,
+    category: editing?.category ?? NONE_KEY,
     dayOfMonth: editing?.recurrence.dayOfMonth || 1,
     subtasks: (editing?.subtasks || []).map((s) => s.label),
   };
@@ -821,10 +810,10 @@ function renderStepMonthly() {
   dayInput.addEventListener("input", () => { data.dayOfMonth = Number(dayInput.value); updateReady(); });
 
   wizardContent.append(
+    renderFieldLabel("Category"),
+    renderCategorySelect(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Pay rent", (v) => { data.label = v; updateReady(); }, data.label),
-    renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Day of month"),
     dayInput,
     renderFieldLabel("Subtasks (optional)"),
@@ -838,7 +827,7 @@ function renderStepDaily() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? activeCategory,
+    category: editing?.category ?? NONE_KEY,
     start: editing?.recurrence.start || "09:00",
     intervalHours: editing?.recurrence.intervalHours || 2,
     end: editing?.recurrence.end || "20:00",
@@ -872,10 +861,10 @@ function renderStepDaily() {
   endInput.addEventListener("input", () => { data.end = endInput.value; updateReady(); });
 
   wizardContent.append(
+    renderFieldLabel("Category"),
+    renderCategorySelect(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Task name"),
     renderLabelInput("e.g. Drink water", (v) => { data.label = v; updateReady(); }, data.label),
-    renderFieldLabel("Category (optional)"),
-    renderCategoryPicker(data.category, (key) => { data.category = key; updateReady(); }),
     renderFieldLabel("Start time"),
     startInput,
     renderFieldLabel("Repeat every (hours)"),
