@@ -15,15 +15,18 @@ messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification || {};
   const now = Date.now();
 
+  console.log("[SW] onBackgroundMessage called at", new Date(now).toISOString(), "body:", body);
+
   // Deduplicate: skip if same body shown in last 2 seconds
   if (lastNotificationBody === body && (now - lastNotificationTime) < 2000) {
-    console.log("[SW] Duplicate notification blocked:", body);
+    console.log("[SW] Duplicate blocked:", body, "last shown", (now - lastNotificationTime), "ms ago");
     return;
   }
 
   lastNotificationTime = now;
   lastNotificationBody = body;
 
+  console.log("[SW] Showing notification:", body);
   self.registration.showNotification(title || "Daily Tasks", {
     body,
     badge: "/icon.png",
