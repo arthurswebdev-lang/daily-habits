@@ -476,6 +476,7 @@ function goToStep(step) {
 // Saves fields onto the task being edited, or creates a new task — the one
 // place that decides between updating in place vs. pushing a new record.
 function commitTask(id, fields) {
+  console.log("[App] commitTask called for:", fields.label);
   const editing = wizard.editingTask;
   if (editing) {
     Object.assign(editing, fields);
@@ -487,6 +488,7 @@ function commitTask(id, fields) {
   }
   closeWizard();
   render();
+  console.log("[App] About to sync after commitTask");
   syncTasksToBackend();
 }
 
