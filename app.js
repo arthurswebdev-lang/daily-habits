@@ -1001,23 +1001,15 @@ async function initFirebase() {
   }
 }
 
-async function requestNotificationPermission() {
+async function getTokenAndRegister() {
   if (!firebaseMessaging) {
     console.log("[Firebase] Messaging not initialized");
     updateFirebaseStatus("❌ Messaging not ready");
     return false;
   }
-  try {
-    console.log("[Firebase] Requesting notification permission...");
-    const permission = await Notification.requestPermission();
-    console.log("[Firebase] Permission result:", permission);
-    if (permission !== "granted") {
-      console.log("[Firebase] Permission denied or dismissed");
-      updateFirebaseStatus("❌ Permission denied");
-      return false;
-    }
 
-    console.log("[Firebase] Permission granted, getting FCM token...");
+  try {
+    console.log("[Firebase] Getting FCM token...");
     updateFirebaseStatus("⏳ Getting token...");
 
     let token;
@@ -1025,10 +1017,8 @@ async function requestNotificationPermission() {
       token = await firebaseMessaging.getToken({ vapidKey: window.FCM_VAPID_KEY });
     } catch (tokenErr) {
       console.error("[Firebase] Token error:", tokenErr.message);
-      // Provide helpful message for GitHub Pages limitation
       if (tokenErr.message.includes("service worker")) {
         updateFirebaseStatus("⚠️ Push notifications limited (GitHub Pages subdirectory)");
-        // Try to register without token
         syncTasksToBackend();
         document.getElementById("enable-notifications-btn").style.display = "none";
         return true;
@@ -1070,11 +1060,37 @@ async function requestNotificationPermission() {
   }
 }
 
+async function requestNotificationPermission() {
+  if (!firebaseMessaging) {
+    console.log("[Firebase] Messaging not initialized");
+    updateFirebaseStatus("❌ Messaging not ready");
+    return false;
+  }
+  try {
+    console.log("[Firebase] Requesting notification permission...");
+    const permission = await Notification.requestPermission();
+    console.log("[Firebase] Permission result:", permission);
+    if (permission !== "granted") {
+      console.log("[Firebase] Permission denied or dismissed");
+      updateFirebaseStatus("❌ Permission denied");
+      return false;
+    }
+    return getTokenAndRegister();
+  } catch (err) {
+    console.error("[Firebase] Permission error:", err);
+    updateFirebaseStatus("❌ Error: " + err.message.substring(0, 50));
+    return false;
+  }
+}
+
 async function registerDeviceAndSync() {
   const btn = document.getElementById("enable-notifications-btn");
   if (Notification.permission === "granted") {
-    await requestNotificationPermission();
+    await getTokenAndRegister();
+  } else if (Notification.permission === "default") {
+    btn.style.display = "block";
   } else {
+    updateFirebaseStatus("⚠️ Notifications denied (enable in Settings)");
     btn.style.display = "block";
   }
 }
