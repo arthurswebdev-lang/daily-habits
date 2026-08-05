@@ -960,17 +960,8 @@ async function initFirebase() {
     }
 
     firebaseMessaging.onMessage((payload) => {
-      const { title, body } = payload.notification || {};
-      if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title || "Daily Tasks", {
-          body,
-          icon: "./icon.png",
-          badge: "./icon.png",
-          tag: "task-notification",
-          requireInteraction: true
-        });
-      }
-      // Play alert sound
+      // Service worker's onBackgroundMessage already shows notification
+      // Only play sound here when app is visible to user
       playAlertSound();
     });
 
