@@ -645,7 +645,7 @@ function renderStepOneTime() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? NONE_KEY,
+    category: editing?.category ?? (tasks.length > 0 ? activeCategory : NONE_KEY),
     subtasks: (editing?.subtasks || []).map((s) => s.label),
   };
   const submitBtn = renderSubmitButton(editing ? "Save changes" : "Add task", () => {
@@ -685,7 +685,7 @@ function renderStepEvent() {
 
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? NONE_KEY,
+    category: editing?.category ?? (tasks.length > 0 ? activeCategory : NONE_KEY),
     date: displayDate,
     time: displayTime,
     subtasks: (editing?.subtasks || []).map((s) => s.label),
@@ -737,7 +737,7 @@ function renderStepWeekly() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? NONE_KEY,
+    category: editing?.category ?? (tasks.length > 0 ? activeCategory : NONE_KEY),
     days: editing ? [...editing.recurrence.days] : [],
     subtasks: (editing?.subtasks || []).map((s) => s.label),
   };
@@ -788,7 +788,7 @@ function renderStepMonthly() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? NONE_KEY,
+    category: editing?.category ?? (tasks.length > 0 ? activeCategory : NONE_KEY),
     dayOfMonth: editing?.recurrence.dayOfMonth || 1,
     subtasks: (editing?.subtasks || []).map((s) => s.label),
   };
@@ -827,7 +827,7 @@ function renderStepDaily() {
   const editing = wizard.editingTask;
   const data = {
     label: editing?.label || "",
-    category: editing?.category ?? NONE_KEY,
+    category: editing?.category ?? (tasks.length > 0 ? activeCategory : NONE_KEY),
     start: editing?.recurrence.start || "09:00",
     intervalHours: editing?.recurrence.intervalHours || 2,
     end: editing?.recurrence.end || "20:00",
